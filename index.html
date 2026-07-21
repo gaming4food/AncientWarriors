@@ -3622,6 +3622,7 @@ function buffedStats(p,w,ay){
 function fireAt(p,w,target,st,ay){
   const mp=enemyPos(target,G.WL,G.IW,G.IH,ay,p.flip);
   const dx=mp.x-w.x,dy=mp.y-(w.y+ay),dist=Math.hypot(dx,dy)||1;
+  w.atkAt=performance.now();w.atkDX=dx/dist;w.atkDY=dy/dist;   // drives the attack-lunge animation
   const pf=w.pf||1,ms=w.ms||0;
   let dmg=st.atk,crit=false;
   const B=(p===G.p1&&G.boons)?G.boons:null;
@@ -4114,6 +4115,36 @@ function drawWarriorSprite(ctx,w,cx,feetY,targetH){
   ctx.drawImage(e.img,t.x,t.y,t.w,t.h,cx-dw/2,feetY-targetH,dw,targetH);
   return true;
 }
+// ── WARRIOR ANIMATION ─────────────────────────────────────────────────────────
+// Procedural motion layered over the static art: a constant idle breath, plus an
+// attack lunge toward the target with a settle-back. Costs no extra art; when real
+// multi-frame spritesheets land these become the "between-frame" motion.
+function warriorAnim(w,now){
+  const ph=(w.uid||0)*0.7;
+  const br=Math.sin(now/620+ph);                    // idle breathing
+  let dx=0,dy=br*0.7,sy=1+br*0.014,rot=0;
+  const el=now-(w.atkAt||-1e9);
+  if(el>=0&&el<ATK_ANIM_MS){                         // attack: lunge out, ease back
+    const t=el/ATK_ANIM_MS;
+    const push=Math.sin(t*Math.PI)*(1-t*0.35);
+    dx+=(w.atkDX||0)*push*6;
+    dy+=(w.atkDY||0)*push*4;
+    sy*=1+push*0.07;
+    rot=(w.atkDX||0)*push*0.11;
+  }
+  return{dx,dy,sy,rot};
+}
+const ATK_ANIM_MS=260;
+// Draw a warrior with its animation transform applied (falls back to procedural art)
+function drawWarriorAnimated(ctx,w,cx,feetY,H,now){
+  const a=warriorAnim(w,now);
+  ctx.save();
+  ctx.translate(cx+a.dx,feetY+a.dy);
+  if(a.rot)ctx.rotate(a.rot);
+  if(a.sy!==1)ctx.scale(1,a.sy);
+  if(!drawWarriorSprite(ctx,w,0,0,H))ctx.drawImage(figSprite(w,0.72),-32,-SPRITE_FEET-38);
+  ctx.restore();
+}
 function preloadSprites(){[...WARRIORS,...MYTHICS].forEach(warriorImg);loadArenaBg();}
 // Optional custom playing-field background (assets/arena.png). Cover-fit to the
 // canvas; falls back to the procedural Voidgate art when the file is absent.
@@ -4291,12 +4322,12 @@ function draw(){
   // depth-sorted (front over back) and every level aura / ult meter / tag is drawn
   // in a TOP pass, guaranteeing indicators are never hidden behind another figure.
   const p2list=G.p2.ws.map(w=>({w,cy:w.y})).sort((a,b)=>a.cy-b.cy);
-  for(const o of p2list){drawPedestal(ctx,o.w.x,o.cy+10,16,o.w.col);if(!drawWarriorSprite(ctx,o.w,o.w.x,o.cy+SPRITE_FEET,SPRITE_H))ctx.drawImage(figSprite(o.w,0.72),o.w.x-32,o.cy-38);}
+  for(const o of p2list){drawPedestal(ctx,o.w.x,o.cy+10,16,o.w.col);drawWarriorAnimated(ctx,o.w,o.w.x,o.cy+SPRITE_FEET,SPRITE_H,now);}
   for(const o of p2list)drawLevelBadge(ctx,o.w.x,o.cy+18,o.w);
   const p1list=[];
   for(let i=0;i<G.p1.ws.length;i++){if(G.drag&&G.drag.wi===i)continue;p1list.push({w:G.p1.ws[i],cy:G.p1.ws[i].y+AH});}
   p1list.sort((a,b)=>a.cy-b.cy);
-  for(const o of p1list){drawUltAura(ctx,o.w.x,o.cy,o.w);drawPedestal(ctx,o.w.x,o.cy+10,16,o.w.col);if(!drawWarriorSprite(ctx,o.w,o.w.x,o.cy+SPRITE_FEET,SPRITE_H))ctx.drawImage(figSprite(o.w,0.72),o.w.x-32,o.cy-38);}
+  for(const o of p1list){drawUltAura(ctx,o.w.x,o.cy,o.w);drawPedestal(ctx,o.w.x,o.cy+10,16,o.w.col);drawWarriorAnimated(ctx,o.w,o.w.x,o.cy+SPRITE_FEET,SPRITE_H,now);}
   for(const o of p1list){drawLevelBadge(ctx,o.w.x,o.cy+18,o.w);drawTargetTag(ctx,o.w.x,o.cy,o.w);}
   // Drag ghost + range ring + sell zone
   if(G.drag&&G.drag.moved){
