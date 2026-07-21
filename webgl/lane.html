@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Ancient Warriors — Perspective Lane (target style)</title>
+<style>
+  html,body{margin:0;padding:0;background:#0b0906;height:100%;overflow:hidden;
+    font-family:'Trebuchet MS',system-ui,sans-serif;color:#e8d0a0}
+  #wrap{display:flex;flex-direction:column;align-items:center;height:100%;justify-content:center;gap:6px}
+  #stage{position:relative;width:375px;height:700px;border:2px solid #8a6a10;border-radius:14px;
+    overflow:hidden;box-shadow:0 0 26px rgba(212,160,23,0.3)}
+  #game{position:absolute;inset:0}
+  .ui{position:absolute;pointer-events:none}
+
+  /* top status bar */
+  #topbar{top:0;left:0;right:0;height:34px;display:flex;align-items:center;gap:8px;padding:0 8px;
+    background:linear-gradient(180deg,rgba(10,7,4,0.92),rgba(10,7,4,0.45));font-size:11px;font-weight:800}
+  .chip{display:flex;align-items:center;gap:4px}
+  .chip b{color:#fff;font-weight:800}
+  #wave{margin-left:auto;color:#ffe9a0;letter-spacing:0.5px}
+  .tbtn{background:#141c34;border:1px solid #3c5a9a;border-radius:7px;padding:3px 9px;color:#cfe0ff;font-weight:800}
+
+  /* fortress bars */
+  #ef{top:44px;right:8px;text-align:right}
+  #yf{bottom:132px;right:8px;text-align:right}
+  .flabel{font-size:8.5px;letter-spacing:1px;color:#e8d0a0;font-weight:800;text-shadow:0 1px 3px #000}
+  .fbar{width:132px;height:15px;border:1.5px solid #6a5228;border-radius:4px;overflow:hidden;
+    background:#1a1208;margin-top:2px;position:relative}
+  .fbar i{position:absolute;inset:0;width:82%;display:block}
+  #ef-fill{background:linear-gradient(180deg,#e8503c,#a8281c)}
+  #yf-fill{background:linear-gradient(180deg,#3c8ce8,#1c58a8)}
+  .fbar span{position:absolute;inset:0;font-size:9px;font-weight:800;color:#fff;
+    display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px #000}
+
+  /* bottom card tray */
+  #tray{bottom:0;left:0;right:0;height:126px;background:linear-gradient(180deg,rgba(10,7,4,0.5),rgba(10,7,4,0.95));
+    display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:6px}
+  #cards{display:flex;gap:5px;justify-content:center;padding:0 8px}
+  .card{width:60px;height:74px;border:2px solid #8a6a10;border-radius:9px;background:#1a1208;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;overflow:hidden}
+  .card canvas{position:absolute;inset:0;width:100%;height:100%}
+  .card .cost{position:relative;font-size:10px;font-weight:800;color:#bfe3ff;background:rgba(8,14,28,0.85);
+    width:100%;text-align:center;padding:2px 0}
+  #elixrow{display:flex;align-items:center;gap:7px;padding:6px 10px 0}
+  #elixnum{width:26px;height:26px;border-radius:50%;background:linear-gradient(180deg,#3ca0ff,#1a5cc8);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;
+    border:2px solid #9fd4ff}
+  #elixbar{flex:1;height:13px;background:#0d1220;border:1.5px solid #2a4a7a;border-radius:4px;
+    display:flex;gap:2px;padding:2px}
+  #elixbar div{flex:1;background:#2a4a7a;border-radius:2px}
+  #elixbar div.on{background:linear-gradient(180deg,#5ec8ff,#2a86e8)}
+  #maxlbl{font-size:9px;color:#8fb8e0;font-weight:800}
+
+  #dbg{top:38px;left:8px;font-size:9px;color:#8be06a;font-weight:800;text-shadow:0 1px 2px #000}
+  .note{width:375px;font-size:10px;color:#8a7a5a;line-height:1.5}
+  b.g{color:#ffd700}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <div id="game"></div>
+
+    <div class="ui" id="topbar">
+      <span class="chip">🪙 <b>350</b></span>
+      <span class="chip">💎 <b>180</b></span>
+      <span class="chip">💀 <b>3/15</b></span>
+      <span id="wave">WAVE 7 / 20</span>
+      <span class="tbtn">1X</span>
+      <span class="tbtn">❚❚</span>
+    </div>
+
+    <div class="ui" id="dbg"><span id="lane-fps">—</span> · <span id="lane-count">—</span></div>
+
+    <div class="ui" id="ef">
+      <div class="flabel">ENEMY FORTRESS</div>
+      <div class="fbar"><i id="ef-fill"></i><span id="ef-hp">—</span></div>
+    </div>
+    <div class="ui" id="yf">
+      <div class="flabel">YOUR FORTRESS</div>
+      <div class="fbar"><i id="yf-fill"></i><span id="yf-hp">—</span></div>
+    </div>
+
+    <div class="ui" id="tray">
+      <div id="cards"></div>
+      <div id="elixrow">
+        <div id="elixnum">7</div>
+        <div id="elixbar"></div>
+        <div id="maxlbl">MAX 10</div>
+      </div>
+    </div>
+  </div>
+  <div class="note">
+    <b class="g">Perspective lane prototype</b> — enemies advance in depth-space and scale toward the camera.
+    Corridor art is a procedural stand-in; warriors use existing front-facing sprites as placeholders
+    (production needs <b class="g">back-view</b> hero art).
+  </div>
+</div>
+<script type="module" src="./src/lane-main.js"></script>
+</body>
+</html>
