@@ -1,0 +1,16 @@
+{
+  "xpNeedPerLevel": 150,
+  "xpPerKill": 5,
+  "goldPerKill": 1,
+  "goldScoreDivisor": 4,
+  "roleGrowth": {
+    "warrior": {"atk": 0.14, "spd": 0.02, "rng": 2},
+    "archer":  {"atk": 0.08, "spd": 0.05, "rng": 4},
+    "mage":    {"atk": 0.18, "spd": 0.00, "rng": 3},
+    "tank":    {"atk": 0.10, "spd": 0.02, "rng": 3}
+  },
+  "abilityPotencyPerLevel": 0.06,
+  "milestoneEveryLevels": 5,
+  "sacrifice": {"base": 100, "levelRamp": 0.6, "rarityFactor": 0.4},
+  "battleStatScale": {"atkMult": 3, "speedMult": 0.4, "baseRange": 180, "minAttackMs": 120}
+}

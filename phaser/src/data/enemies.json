@@ -1,0 +1,9 @@
+{
+  "types": [
+    {"key":"goblin",  "label":"Goblin",  "col":"#4a7a44","hp":500,  "spd":22,"reward":5,  "score":10, "dmg":1,"radius":8},
+    {"key":"skeleton","label":"Skeleton","col":"#aaaaaa","hp":900,  "spd":30,"reward":10, "score":15, "dmg":1,"radius":8},
+    {"key":"orc",     "label":"Orc",     "col":"#cc4444","hp":2200, "spd":15,"reward":20, "score":30, "dmg":2,"radius":10,"elite":true},
+    {"key":"boss",    "label":"Boss",    "col":"#9900cc","hp":18000,"spd":10,"reward":500,"score":500,"dmg":3,"radius":14,"boss":true}
+  ],
+  "spawnWeights": {"goblin":0.70,"skeleton":0.18,"orc":0.12}
+}

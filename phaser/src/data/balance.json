@@ -1,0 +1,34 @@
+{
+  "arena": {"width": 375, "arenaHeight": 244, "wall": 28, "cols": 4, "rows": 4, "pathInset": 9},
+  "match": {"timerSec": 90, "baseHp": 10, "maxDtMs": 80},
+  "spawn": {
+    "baseIntervalMs": 3400, "minIntervalMs": 2000, "endlessMinIntervalMs": 1100,
+    "waveIntervalStepMs": 120, "timeIntervalStepMs": 400, "endlessTierStepMs": 250,
+    "groupBase": 3, "groupPerTwoWaves": 1, "groupMax": 12,
+    "mobCap": 34, "initialP1": 6, "initialP2": 5,
+    "hpPerWave": 60, "endlessHpRampSec": 45, "endlessTierSec": 20
+  },
+  "boss": {"hpPerWave": 1000, "endlessRespawnMs": 45000, "tierHpMult": 0.6, "focusFireBias": 1000},
+  "waves": {"killTargetBase": 6, "killTargetPerWave": 2, "clearBonusGold": 25},
+  "economy": {"freeSummons": 3, "summonBaseCost": 20, "summonCostStep": 10, "skipWaveGold": 15, "skipWaveSpawns": 5, "gachaCost": 1000, "startGold": 2000},
+  "merge": {"atkMult": 1.65, "spdMult": 0.72, "minSpdMs": 100, "rangeAdd": 16, "maxStars": 4},
+  "combat": {"projectileSpeed": 290, "projectileLifeMs": 3000, "hitRadius": 12, "rangeSlack": 30, "projectileCap": 120, "homingInertia": 0.84},
+  "abilities": {
+    "auraRadius": 110,
+    "banner": {"atk": 0.25}, "inspire": {"speedMult": 0.8, "cap": 0.6}, "tactics": {"range": 35},
+    "rage": {"atkPerEnemy": 0.08}, "bushido": {"speedPerKill": 0.04, "cap": 0.45},
+    "assassin": {"every": 5, "minEvery": 3, "mult": 4},
+    "flurry": {"step": 0.15, "maxStacks": 5},
+    "twin": {"every": 3, "minEvery": 2},
+    "wrath": {"maxBonus": 1.0}, "moonfire": {"threshold": 0.7, "bonus": 0.8}, "siege": {"bonus": 1.5},
+    "curse": {"amp": 0.3, "durationMs": 3000},
+    "venom": {"fraction": 0.5, "durationMs": 3000}, "ignite": {"fraction": 0.6, "durationMs": 2500},
+    "root": {"durationMs": 1000},
+    "bash": {"pushPx": 18},
+    "cleave": {"radius": 35, "fraction": 0.5}, "acid": {"radius": 45, "fraction": 0.6},
+    "chain": {"jumps": 2, "fraction": 0.55, "maxFraction": 0.9, "radius": 90},
+    "sanctuary": {"slow": 0.3, "maxSlow": 0.5},
+    "milestoneSplashRadius": 5
+  },
+  "ai": {"actIntervalMs": 5000, "maxUnits": 12, "startUnits": 3}
+}

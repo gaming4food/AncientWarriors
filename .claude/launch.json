@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "autoPort": true,
+  "configurations": [
+    {
+      "name": "ancient-warriors",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "-c-1"],
+      "port": 8124
+    }
+  ]
+}
