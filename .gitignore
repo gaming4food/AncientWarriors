@@ -23,3 +23,6 @@ Desktop.ini
 *.log
 tmp/
 temp/
+
+# Local snapshots for instant rollback (git tag v1.0-canvas2d is the real source of truth)
+backup/
