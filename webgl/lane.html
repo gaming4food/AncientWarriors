@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Ancient Warriors — Perspective Lane (target style)</title>
+<title>Ancient Warriors — Perspective Lane (playable)</title>
 <style>
   html,body{margin:0;padding:0;background:#0b0906;height:100%;overflow:hidden;
     font-family:'Trebuchet MS',system-ui,sans-serif;color:#e8d0a0}
@@ -15,32 +15,47 @@
 
   /* top status bar */
   #topbar{top:0;left:0;right:0;height:34px;display:flex;align-items:center;gap:8px;padding:0 8px;
-    background:linear-gradient(180deg,rgba(10,7,4,0.92),rgba(10,7,4,0.45));font-size:11px;font-weight:800}
+    background:linear-gradient(180deg,rgba(10,7,4,0.92),rgba(10,7,4,0.45));font-size:11px;font-weight:800;z-index:5}
   .chip{display:flex;align-items:center;gap:4px}
   .chip b{color:#fff;font-weight:800}
-  #wave{margin-left:auto;color:#ffe9a0;letter-spacing:0.5px}
-  .tbtn{background:#141c34;border:1px solid #3c5a9a;border-radius:7px;padding:3px 9px;color:#cfe0ff;font-weight:800}
+  #hud-wave{margin-left:auto;color:#ffe9a0;letter-spacing:0.5px}
+  .tbtn{background:#141c34;border:1px solid #3c5a9a;border-radius:7px;padding:3px 9px;color:#cfe0ff;
+    font-weight:800;pointer-events:auto;cursor:pointer}
+  .tbtn:active{filter:brightness(1.4)}
 
   /* fortress bars */
-  #ef{top:44px;right:8px;text-align:right}
-  #yf{bottom:132px;right:8px;text-align:right}
+  #ef{top:44px;right:8px;text-align:right;z-index:5}
+  #yf{bottom:132px;right:8px;text-align:right;z-index:5}
   .flabel{font-size:8.5px;letter-spacing:1px;color:#e8d0a0;font-weight:800;text-shadow:0 1px 3px #000}
   .fbar{width:132px;height:15px;border:1.5px solid #6a5228;border-radius:4px;overflow:hidden;
     background:#1a1208;margin-top:2px;position:relative}
-  .fbar i{position:absolute;inset:0;width:82%;display:block}
+  .fbar i{position:absolute;inset:0;width:100%;display:block;transition:width .3s}
   #ef-fill{background:linear-gradient(180deg,#e8503c,#a8281c)}
   #yf-fill{background:linear-gradient(180deg,#3c8ce8,#1c58a8)}
   .fbar span{position:absolute;inset:0;font-size:9px;font-weight:800;color:#fff;
     display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px #000}
 
+  /* spell button */
+  #spellbtn{bottom:138px;right:8px;width:46px;height:46px;border-radius:50%;pointer-events:auto;cursor:pointer;
+    background:radial-gradient(circle at 35% 30%,#5a3aa8,#2a1458);border:2px solid #b08aff;z-index:6;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:15px;
+    box-shadow:0 0 12px rgba(150,90,255,0.5)}
+  #spellbtn span{font-size:9px;font-weight:800;color:#e0ccff}
+  #spellbtn:active{filter:brightness(1.5)}
+  #yf{bottom:196px}
+
   /* bottom card tray */
   #tray{bottom:0;left:0;right:0;height:126px;background:linear-gradient(180deg,rgba(10,7,4,0.5),rgba(10,7,4,0.95));
-    display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:6px}
+    display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:6px;z-index:5}
   #cards{display:flex;gap:5px;justify-content:center;padding:0 8px}
-  .card{width:60px;height:74px;border:2px solid #8a6a10;border-radius:9px;background:#1a1208;
-    display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;overflow:hidden}
-  .card canvas{position:absolute;inset:0;width:100%;height:100%}
-  .card .cost{position:relative;font-size:10px;font-weight:800;color:#bfe3ff;background:rgba(8,14,28,0.85);
+  .card{width:60px;height:80px;border:2px solid #8a6a10;border-radius:9px;background:#1a1208;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;
+    overflow:hidden;pointer-events:auto;cursor:pointer;transition:transform .08s}
+  .card:active{transform:scale(0.93);border-color:#ffd700}
+  .card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top}
+  .card .lvl{position:relative;font-size:8px;font-weight:800;color:#ffe9a0;background:rgba(30,20,6,0.85);
+    width:100%;text-align:center;padding:1px 0;letter-spacing:0.5px}
+  .card .cost{position:relative;font-size:10px;font-weight:800;color:#bfe3ff;background:rgba(8,14,28,0.9);
     width:100%;text-align:center;padding:2px 0}
   #elixrow{display:flex;align-items:center;gap:7px;padding:6px 10px 0}
   #elixnum{width:26px;height:26px;border-radius:50%;background:linear-gradient(180deg,#3ca0ff,#1a5cc8);
@@ -52,7 +67,15 @@
   #elixbar div.on{background:linear-gradient(180deg,#5ec8ff,#2a86e8)}
   #maxlbl{font-size:9px;color:#8fb8e0;font-weight:800}
 
-  #dbg{top:38px;left:8px;font-size:9px;color:#8be06a;font-weight:800;text-shadow:0 1px 2px #000}
+  /* end overlay */
+  #endov{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;background:rgba(5,3,10,0.88);z-index:20;pointer-events:auto}
+  #end-title2{font-size:30px;font-weight:900;color:#ffd700;text-shadow:0 0 18px rgba(255,200,40,0.6)}
+  #end-msg{font-size:12px;color:#c8a24a}
+  #endov button{background:linear-gradient(135deg,#c8920f,#ffd700);color:#241a04;border:none;border-radius:11px;
+    font-size:14px;font-weight:800;padding:12px 26px;cursor:pointer;font-family:inherit}
+
+  #dbg{top:38px;left:8px;font-size:9px;color:#8be06a;font-weight:800;text-shadow:0 1px 2px #000;z-index:5}
   .note{width:375px;font-size:10px;color:#8a7a5a;line-height:1.5}
   b.g{color:#ffd700}
 </style>
@@ -64,12 +87,12 @@
     <div id="game"></div>
 
     <div class="ui" id="topbar">
-      <span class="chip">🪙 <b>350</b></span>
-      <span class="chip">💎 <b>180</b></span>
-      <span class="chip">💀 <b>3/15</b></span>
-      <span id="wave">WAVE 7 / 20</span>
-      <span class="tbtn">1X</span>
-      <span class="tbtn">❚❚</span>
+      <span class="chip">🪙 <b id="hud-gold">350</b></span>
+      <span class="chip">💎 <b id="hud-gems">180</b></span>
+      <span class="chip">💀 <b id="hud-kills">0 / 8</b></span>
+      <span id="hud-wave">WAVE 1 / 20</span>
+      <button class="tbtn" id="spdbtn" onclick="AWLANE.speed()">1X</button>
+      <button class="tbtn" id="pausebtn" onclick="AWLANE.pause()">❚❚</button>
     </div>
 
     <div class="ui" id="dbg"><span id="lane-fps">—</span> · <span id="lane-count">—</span></div>
@@ -83,6 +106,8 @@
       <div class="fbar"><i id="yf-fill"></i><span id="yf-hp">—</span></div>
     </div>
 
+    <div class="ui" id="spellbtn" onclick="AWLANE.spell()">⚡<span id="spell-n">3/3</span></div>
+
     <div class="ui" id="tray">
       <div id="cards"></div>
       <div id="elixrow">
@@ -91,11 +116,16 @@
         <div id="maxlbl">MAX 10</div>
       </div>
     </div>
+
+    <div id="endov">
+      <div id="end-title2">🏆 VICTORY!</div>
+      <div id="end-msg"></div>
+      <button onclick="location.reload()">⚔ Battle Again</button>
+    </div>
   </div>
   <div class="note">
-    <b class="g">Perspective lane prototype</b> — enemies advance in depth-space and scale toward the camera.
-    Art auto-detects: <b class="g">corridor_full.png</b> (scene plate, heroes baked in) &gt;
-    <b class="g">corridor.png</b> (clean plate) + <b class="g">back/b&lt;id&gt;.png</b> heroes &gt; procedural stand-ins.
+    <b class="g">Playable perspective lane</b> — tap a card to summon/upgrade its hero (costs elixir),
+    ⚡ casts Judgement, kills chip the enemy fortress, breaches chip yours. Survive 20 waves or raze their fortress.
   </div>
 </div>
 <script type="module" src="./src/lane-main.js"></script>
