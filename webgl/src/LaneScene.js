@@ -30,15 +30,28 @@ export default class LaneScene extends Phaser.Scene {
   init(data) { this.D = data.gameData; }
 
   preload() {
-    const D = this.D;
+    const D = this.D, art = D.art || { corridor: false, back: {} };
     this.squadDefs = [15, 2, 4, 10, 8].map(id => D.warriors.find(w => w.id === id));
-    this.squadDefs.forEach(w => this.load.image('w' + w.id, `../assets/warriors/w${w.id}.png`));
+    // back-view production art when present; front-facing sprite as placeholder
+    this.squadDefs.forEach(w => {
+      if (art.back[w.id]) this.load.image('b' + w.id, `../assets/warriors/back/b${w.id}.png`);
+      else this.load.image('w' + w.id, `../assets/warriors/w${w.id}.png`);
+    });
+    if (art.corridor) this.load.image('corridor', '../assets/lane/corridor.png');
     ['goblin', 'skeleton', 'orc', 'shieldbearer', 'ogre', 'boss']
       .forEach(k => this.load.image('e_' + k, `../assets/enemies/${k}.png`));
   }
 
   create() {
-    this.buildCorridor();
+    // painted corridor when the file exists (cover-fit), procedural stand-in otherwise
+    if (this.textures.exists('corridor')) {
+      const src = this.textures.get('corridor').getSourceImage();
+      const s = Math.max(W / src.width, H / src.height);
+      this.add.image(W / 2, H / 2, 'corridor')
+        .setDisplaySize(src.width * s, src.height * s).setDepth(0);
+    } else {
+      this.buildCorridor();
+    }
 
     this.enemyLayer = this.add.container(0, 0).setDepth(20);
     this.warriorLayer = this.add.container(0, 0).setDepth(60);
@@ -110,7 +123,8 @@ export default class LaneScene extends Phaser.Scene {
       // glowing summon platform
       const plat = this.add.ellipse(pos.x, pos.y + 26, 74, 26, 0xffd24a, 0.18).setDepth(50);
       plat.setStrokeStyle(2, 0xffe9a0, 0.75);
-      const img = this.add.image(pos.x, pos.y + 26, 'w' + def.id).setOrigin(0.5, 1);
+      const key = this.textures.exists('b' + def.id) ? 'b' + def.id : 'w' + def.id;
+      const img = this.add.image(pos.x, pos.y + 26, key).setOrigin(0.5, 1);
       const targetH = 132;
       img.setDisplaySize(img.width * (targetH / img.height), targetH);
       this.warriorLayer.add(img);

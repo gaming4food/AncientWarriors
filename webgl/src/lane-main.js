@@ -3,6 +3,17 @@ import LaneScene from './LaneScene.js';
 
 const gameData = await fetch('./data/game-data.json').then(r => r.json());
 
+// Probe for production art BEFORE Phaser boots, so preload only requests files
+// that exist (keeps the console clean and enables graceful fallbacks).
+// - ../assets/lane/corridor.png            painted corridor background
+// - ../assets/warriors/back/b<id>.png      back-view hero sprites
+const SQUAD_IDS = [15, 2, 4, 10, 8];
+const probe = url => fetch(url, { method: 'HEAD' }).then(r => r.ok).catch(() => false);
+const art = { corridor: await probe('../assets/lane/corridor.png'), back: {} };
+await Promise.all(SQUAD_IDS.map(async id => { art.back[id] = await probe(`../assets/warriors/back/b${id}.png`); }));
+gameData.art = art;
+console.log('[lane] production art:', JSON.stringify(art));
+
 const game = new Phaser.Game({
   type: Phaser.WEBGL,
   parent: 'game',
