@@ -54,6 +54,9 @@
   .card:active{transform:scale(0.93);border-color:#ffd700}
   .card.maxed{border-color:#3a7a4a}
   .card.maxed .cost{color:#8be06a}
+  .card.ascend{border-color:#ffd700;animation:ascendpulse 0.8s ease-in-out infinite}
+  .card.ascend .lvl{color:#ffd700;background:rgba(60,40,6,0.95)}
+  @keyframes ascendpulse{0%,100%{box-shadow:0 0 4px rgba(255,215,0,0.5)}50%{box-shadow:0 0 14px rgba(255,215,0,0.95)}}
   .card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top}
   .card .lvl{position:relative;font-size:8px;font-weight:800;color:#ffe9a0;background:rgba(30,20,6,0.85);
     width:100%;text-align:center;padding:1px 0;letter-spacing:0.5px}
@@ -126,9 +129,9 @@
     </div>
   </div>
   <div class="note">
-    <b class="g">Playable perspective lane</b> — tap a card <i>or click the warrior</i> to summon, then
-    reinforce (more warriors, up to ×5) — elixir is your allowance. ⚡ casts Judgement.
-    Kills chip the enemy fortress, breaches chip yours. Survive 20 waves or raze their fortress.
+    <b class="g">Playable perspective lane</b> — summon, reinforce to ×5, then <b class="g">⭐ ASCEND</b>
+    to fuse the squad into a stronger elite and unlock its signature ability (Merlin=Chain, Viking=Cleave,
+    Robin=Twin, Joan=Inspire, Cleo=Venom). Elixir is your allowance. ⚡ casts Judgement.
   </div>
 </div>
 <script type="module" src="./src/lane-main.js"></script>

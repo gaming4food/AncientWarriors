@@ -14,6 +14,12 @@ const SCALE_FAR = 0.13, SCALE_NEAR = 1.0;
 const MAX_WAVE = 20, FORT_MAX = 10000;
 const ELIXIR_MAX = 10, ELIXIR_MS = 1400;
 const MAX_STACK = 5;   // reinforcements per platform (elixir is the allowance)
+const MAX_RANK = 3;    // ascension tiers: fuse a full ×5 stack into one stronger elite
+const RANK_MULT = [1, 5, 22];        // per-shot attack multiplier by rank (1..3)
+const RANK_STARS = ['', '★', '★★'];   // stars shown for ascended ranks (rank 2,3)
+// Signature ability unlocked at ascension (rank ≥ 2), scaling with rank.
+const ABILITY_NAME = { twin: 'Twin Arrows', inspire: 'Inspire', chain: 'Chain Lightning',
+                       cleave: 'Cleave', venom: 'Venom' };
 
 function persp(t) { return t * t * 0.68 + t * 0.32; }
 export function project(t, laneX) {
@@ -172,9 +178,9 @@ export default class LaneScene extends Phaser.Scene {
       const img = this.add.image(S.x, S.y, key).setOrigin(0.5, 1);
       img.setDisplaySize(img.width * (S.h / img.height), S.h);
       this.warriorLayer.add(img);
-      const w = { def, img, plat, i, x: S.x, y: S.y, baseH: S.h, texKey: key,
+      const w = { def, img, plat, i, x: S.x, y: S.y, baseH: S.h, slotH: S.h, texKey: key,
                   deployed: this.plate,
-                  count: this.plate ? 1 : 0,
+                  count: this.plate ? 1 : 0, rank: 1,
                   cost: [2, 3, 3, 4, 3][i],
                   cd: 0, spd: def.aspd * 0.55, range: 0.9,
                   phase: Math.random() * 6.28, atkAt: -1e9, flankers: [] };
@@ -193,16 +199,21 @@ export default class LaneScene extends Phaser.Scene {
     });
   }
 
-  // per-unit attack (each stacked warrior fires its own shot — quantity, not level)
-  heroAtk(w) { return Math.round(w.def.atk * 3); }
-  // rising cost: 1st = base (summon), each reinforcement costs base + units already fielded
+  // per-warrior attack, scaled by ascension rank (quantity via count, quality via rank)
+  heroAtk(w) { return Math.round(w.def.atk * 3 * RANK_MULT[w.rank - 1]); }
+  // rising reinforcement cost: base + units already fielded (per rank)
   upCost(w) { return w.deployed ? w.cost + w.count : w.cost; }
+  // ascension cost: fuse a full ×5 stack into a rank-up elite (bigger commitment)
+  ascendCost(w) { return 6 + w.rank * 2; }
+  canAscend(w) { return w.deployed && w.count >= MAX_STACK && w.rank < MAX_RANK; }
 
-  // card tap / warrior click: summon if empty, else add a reinforcement (more warriors).
+  // card tap / warrior click: summon → reinforce (×5) → ASCEND (rank up) → reinforce again…
   cardTap(i) {
     if (this.over) return 'over';
     const w = this.warriors[i];
-    if (w.deployed && w.count >= MAX_STACK) { this.toast(w.def.name + ' squad is full (×' + MAX_STACK + ')', '#c8a24a'); return 'full'; }
+    // full stack + can rank up → this action ascends instead of reinforcing
+    if (this.canAscend(w)) return this.ascend(w);
+    if (w.deployed && w.count >= MAX_STACK) { this.toast(w.def.name + ' is fully ascended!', '#ffd24a'); return 'max'; }
     const cost = this.upCost(w);
     if (this.elixir < cost) { this.toast('Need ' + cost + ' elixir!', '#7ec8ff'); return 'poor'; }
     this.elixir -= cost;
@@ -214,12 +225,53 @@ export default class LaneScene extends Phaser.Scene {
     } else {
       w.count++;
       this.addFlanker(w);
-      w.badge.setVisible(!this.plate).setText('×' + w.count);
+      this.updateBadge(w);
       this.summonFx(w);
       this.toast(w.def.name + ' ×' + w.count + '  reinforced!', '#8be06a');
     }
     this.hudSync(true);
     return 'ok';
+  }
+
+  // ASCENSION — fuse the five stacked warriors into one stronger elite (rank up),
+  // unlocking / strengthening the hero's signature ability. The merge payoff.
+  ascend(w) {
+    const cost = this.ascendCost(w);
+    if (this.elixir < cost) { this.toast('Ascend needs ' + cost + ' elixir!', '#c8a24a'); return 'poor'; }
+    this.elixir -= cost;
+    w.rank++; w.count = 1;
+    // the five figures collapse into a single, larger elite
+    w.flankers.forEach(f => f.img.destroy()); w.flankers = [];
+    w.baseH = Math.round(w.slotH * (1 + 0.14 * (w.rank - 1)));
+    if (!this.plate) { w.img.setDisplaySize(w.img.width * (w.baseH / w.img.height), w.baseH); w.img.setTint(this.rankTint(w.rank)); }
+    this.ascendFx(w);
+    this.updateBadge(w);
+    const ab = ABILITY_NAME[w.def.ab];
+    this.toast('⭐ ' + w.def.name + ' ASCENDED — ' + RANK_STARS[w.rank - 1] + (ab ? '  ' + ab + '!' : ''), '#ffd24a');
+    this.hudSync(true);
+    return 'ok';
+  }
+
+  rankTint(rank) { return rank >= 3 ? 0xffe0a0 : rank === 2 ? 0xd8f0ff : 0xffffff; }
+
+  updateBadge(w) {
+    const stars = RANK_STARS[w.rank - 1];
+    const txt = (stars ? stars + ' ' : '') + '×' + w.count;
+    w.badge.setVisible(!this.plate && (w.rank > 1 || w.count > 1)).setText(txt)
+      .setBackgroundColor(w.rank >= 3 ? '#8a5a10' : w.rank === 2 ? '#2a4a7a' : '#7a3a10');
+  }
+
+  ascendFx(w) {
+    this.cameras.main.flash(160, 255, 230, 160, false);
+    const ring = this.add.ellipse(w.x, w.y, 90, 34).setStrokeStyle(4, 0xffe9a0, 1)
+      .setBlendMode(Phaser.BlendModes.ADD).setDepth(88);
+    this.tweens.add({ targets: ring, scaleX: 2.6, scaleY: 2.6, alpha: 0, duration: 560, onComplete: () => ring.destroy() });
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * 6.28, c = this.add.circle(w.x, w.y - w.baseH * 0.4, 3, 0xffe9a0)
+        .setBlendMode(Phaser.BlendModes.ADD).setDepth(89);
+      this.tweens.add({ targets: c, x: w.x + Math.cos(a) * 48, y: w.y - w.baseH * 0.4 + Math.sin(a) * 30,
+        alpha: 0, duration: 620, onComplete: () => c.destroy() });
+    }
   }
 
   // add a small flanking warrior figure so the squad visibly grows
@@ -356,6 +408,12 @@ export default class LaneScene extends Phaser.Scene {
         .setSize((bw - 2) * Math.max(0, m.hp / m.mhp), 3 * p.scale + 1).setDepth(71);
     }
 
+    // Inspire aura (Joan, ascended): all heroes fire faster
+    this.fireBoost = 1;
+    for (const o of this.warriors)
+      if (o.deployed && o.def.ab === 'inspire' && o.rank >= 2)
+        this.fireBoost = Math.min(this.fireBoost, 1 - 0.16 * (o.rank - 1));
+
     // heroes
     for (const w of this.warriors) {
       if (!w.deployed) continue;
@@ -380,14 +438,23 @@ export default class LaneScene extends Phaser.Scene {
           if (m.t > bt) { bt = m.t; best = m; }
         }
         if (best) {
-          w.cd = w.spd; w.atkAt = time;
+          w.cd = w.spd * this.fireBoost; w.atkAt = time;
+          // Twin Arrows (Robin, ascended): +1 extra shot per rank above 1
+          const twinBonus = (w.def.ab === 'twin' && w.rank >= 2) ? (w.rank - 1) : 0;
+          const shots = w.count + twinBonus;
           // ONE volley per stacked warrior — more warriors = more shots (staggered)
-          for (let u = 0; u < w.count; u++) {
-            const ox = (u - (w.count - 1) / 2) * 11;   // px spread across the squad
+          for (let u = 0; u < shots; u++) {
+            const ox = (u - (shots - 1) / 2) * 11;   // px spread across the squad
             this.time.delayedCall(u * 55, () => { if (!this.over) this.fire(w, best, ox); });
           }
         }
       }
+    }
+
+    // enemy poison ticks (Cleopatra's Venom)
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const m = this.enemies[i];
+      if (m.poison > 0) { m.hp -= m.poison * dt / 1000; m.poisonLeft -= dt; if (m.poisonLeft <= 0) m.poison = 0; }
     }
 
     // projectiles — screen-space homing from the hero's platform to the target
@@ -398,7 +465,7 @@ export default class LaneScene extends Phaser.Scene {
       const tp = project(tgt.t, tgt.laneX);
       const tx = tp.x, ty = tp.y - tgt.baseH * tp.scale * 0.5;
       const dx = tx - pr.x, dy = ty - pr.y, d = Math.hypot(dx, dy) || 1;
-      if (d < 14) { tgt.hp -= pr.dmg; this.burst(tgt, true, pr.tint); pr.img.destroy(); this.projs.splice(i, 1); continue; }
+      if (d < 14) { tgt.hp -= pr.dmg; this.onHit(pr, tgt, tx, ty); pr.img.destroy(); this.projs.splice(i, 1); continue; }
       const step = pr.spd * dt / 1000;
       pr.x += dx / d * step; pr.y += dy / d * step;
       pr.img.setPosition(pr.x, pr.y);
@@ -411,9 +478,53 @@ export default class LaneScene extends Phaser.Scene {
     if (!this.enemies.includes(target)) return;   // target may have died during the stagger
     const col = Phaser.Display.Color.HexStringToColor(w.def.pc || '#ffffff').color;
     const sx = w.x + (ox || 0), sy = w.y - w.baseH * 0.55;
-    const img = this.add.circle(sx, sy, 3.6, col).setBlendMode(Phaser.BlendModes.ADD).setDepth(56);
+    const r = (w.rank >= 2 && w.def.ab === 'chain') ? 4.4 : 3.6;
+    const img = this.add.circle(sx, sy, r, col).setBlendMode(Phaser.BlendModes.ADD).setDepth(56);
     this.fxLayer.add(img);
-    this.projs.push({ x: sx, y: sy, spd: 560, tid: target.id, dmg: this.heroAtk(w), img, tint: col });
+    // ability rides on the projectile; only active once ascended (rank ≥ 2)
+    const ab = w.rank >= 2 ? w.def.ab : null;
+    this.projs.push({ x: sx, y: sy, spd: 560, tid: target.id, dmg: this.heroAtk(w), img, tint: col, ab, rank: w.rank });
+  }
+
+  // Signature on-hit effects (rank ≥ 2)
+  onHit(pr, tgt, hx, hy) {
+    this.burst(tgt, true, pr.tint);
+    if (pr.ab === 'chain') {                 // Merlin: arc to nearby enemies
+      const jumps = pr.rank;                 // 2 at rank2, 3 at rank3
+      let from = tgt, hit = new Set([tgt.id]);
+      for (let j = 0; j < jumps; j++) {
+        let nx = null, nd = 1e9; const fp = project(from.t, from.laneX);
+        for (const m of this.enemies) {
+          if (hit.has(m.id) || m.hp <= 0) continue;
+          const mp = project(m.t, m.laneX), dd = Math.hypot(mp.x - fp.x, mp.y - fp.y);
+          if (dd < 90 && dd < nd) { nd = dd; nx = m; }
+        }
+        if (!nx) break;
+        hit.add(nx.id); nx.hp -= Math.round(pr.dmg * 0.5); this.burst(nx, true, 0x8fd8ff);
+        const a = project(from.t, from.laneX), b = project(nx.t, nx.laneX);
+        this.bolt(a.x, a.y - 12, b.x, b.y - 12);
+        from = nx;
+      }
+    } else if (pr.ab === 'cleave') {         // Viking: splash around the target
+      const rad = 34 + pr.rank * 10;
+      for (const m of this.enemies) {
+        if (m.id === tgt.id || m.hp <= 0) continue;
+        const mp = project(m.t, m.laneX);
+        if (Math.hypot(mp.x - hx, mp.y - hy) < rad) { m.hp -= Math.round(pr.dmg * 0.5); this.burst(m, true, pr.tint); }
+      }
+      const ring = this.add.circle(hx, hy, 6, pr.tint, 0.5).setBlendMode(Phaser.BlendModes.ADD).setDepth(82);
+      this.tweens.add({ targets: ring, scale: rad / 6, alpha: 0, duration: 260, onComplete: () => ring.destroy() });
+    } else if (pr.ab === 'venom') {          // Cleopatra: poison over time
+      tgt.poison = Math.round(pr.dmg * (0.2 + 0.1 * pr.rank)); tgt.poisonLeft = 2200;
+    }
+  }
+
+  bolt(x1, y1, x2, y2) {
+    const g = this.add.graphics().setDepth(83).setBlendMode(Phaser.BlendModes.ADD);
+    g.lineStyle(2, 0x8fd8ff, 1); g.beginPath(); g.moveTo(x1, y1);
+    g.lineTo((x1 + x2) / 2 + (Math.random() * 8 - 4), (y1 + y2) / 2 + (Math.random() * 8 - 4));
+    g.lineTo(x2, y2); g.strokePath();
+    this.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() });
   }
 
   burst(m, small, tint) {
@@ -463,11 +574,15 @@ export default class LaneScene extends Phaser.Scene {
     const pips = document.querySelectorAll('#elixbar div');
     pips.forEach((d, i) => d.className = i < Math.floor(this.elixir) ? 'on' : '');
     if (full) this.warriors.forEach((w, i) => {
-      const maxed = w.deployed && w.count >= MAX_STACK;
-      set('cost-' + i, maxed ? '—' : this.upCost(w));
-      set('clvl-' + i, !w.deployed ? 'SUMMON' : (maxed ? 'MAX ×' + MAX_STACK : '×' + w.count + ' · +1'));
+      const stars = RANK_STARS[w.rank - 1];
+      let label, cost, maxed = false, ascend = false;
+      if (!w.deployed) { label = 'SUMMON'; cost = w.cost; }
+      else if (this.canAscend(w)) { label = '⭐ ASCEND'; cost = this.ascendCost(w); ascend = true; }
+      else if (w.count >= MAX_STACK) { label = 'MAX ' + stars; cost = '—'; maxed = true; }
+      else { label = (stars ? stars + ' ' : '') + '×' + w.count + ' · +1'; cost = this.upCost(w); }
+      set('clvl-' + i, label); set('cost-' + i, cost);
       const card = document.getElementById('card-' + i);
-      if (card) card.classList.toggle('maxed', maxed);
+      if (card) { card.classList.toggle('maxed', maxed); card.classList.toggle('ascend', ascend); }
     });
     set('lane-fps', Math.round(this.game.loop.actualFps) + ' FPS');
     set('lane-count', this.enemies.length + ' enemies');
