@@ -52,6 +52,8 @@
     display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;
     overflow:hidden;pointer-events:auto;cursor:pointer;transition:transform .08s}
   .card:active{transform:scale(0.93);border-color:#ffd700}
+  .card.maxed{border-color:#3a7a4a}
+  .card.maxed .cost{color:#8be06a}
   .card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top}
   .card .lvl{position:relative;font-size:8px;font-weight:800;color:#ffe9a0;background:rgba(30,20,6,0.85);
     width:100%;text-align:center;padding:1px 0;letter-spacing:0.5px}
@@ -124,8 +126,9 @@
     </div>
   </div>
   <div class="note">
-    <b class="g">Playable perspective lane</b> — tap a card to summon/upgrade its hero (costs elixir),
-    ⚡ casts Judgement, kills chip the enemy fortress, breaches chip yours. Survive 20 waves or raze their fortress.
+    <b class="g">Playable perspective lane</b> — tap a card <i>or click the warrior</i> to summon, then
+    reinforce (more warriors, up to ×5) — elixir is your allowance. ⚡ casts Judgement.
+    Kills chip the enemy fortress, breaches chip yours. Survive 20 waves or raze their fortress.
   </div>
 </div>
 <script type="module" src="./src/lane-main.js"></script>

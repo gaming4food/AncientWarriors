@@ -35,7 +35,7 @@ const cards = document.getElementById('cards');
 SQUAD_IDS.forEach((id, i) => {
   const w = gameData.warriors.find(x => x.id === id);
   const el = document.createElement('div');
-  el.className = 'card';
+  el.className = 'card'; el.id = 'card-' + i;
   el.innerHTML = `<img src="../assets/warriors/w${id}.png" alt="${w.name}">
     <div class="lvl" id="clvl-${i}">SUMMON</div>
     <div class="cost">💧 <span id="cost-${i}">—</span></div>`;

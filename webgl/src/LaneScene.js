@@ -13,6 +13,7 @@ const HALF_FAR = 0.05 * W, HALF_NEAR = 0.45 * W;
 const SCALE_FAR = 0.13, SCALE_NEAR = 1.0;
 const MAX_WAVE = 20, FORT_MAX = 10000;
 const ELIXIR_MAX = 10, ELIXIR_MS = 1400;
+const MAX_STACK = 5;   // reinforcements per platform (elixir is the allowance)
 
 function persp(t) { return t * t * 0.68 + t * 0.32; }
 export function project(t, laneX) {
@@ -149,42 +150,66 @@ export default class LaneScene extends Phaser.Scene {
       const img = this.add.image(pos.x, pos.y + 26, key).setOrigin(0.5, 1);
       img.setDisplaySize(img.width * (132 / img.height), 132);
       this.warriorLayer.add(img);
-      const w = { def, img, plat, laneX, x: pos.x, y: pos.y + 26,
+      const w = { def, img, plat, laneX, i, x: pos.x, y: pos.y + 26, texKey: key,
                   deployed: this.plate,             // plate mode: painted heroes start fielded
-                  lvl: 1, cost: [2, 3, 3, 4, 3][i],   // costs follow the painted order
+                  count: this.plate ? 1 : 0,        // squad size on this platform (0 = not summoned)
+                  cost: [2, 3, 3, 4, 3][i],         // costs follow the painted order
                   cd: 0, spd: def.aspd * 0.55, range: 0.9,
-                  phase: Math.random() * 6.28, atkAt: -1e9 };
-      w.badge = this.add.text(pos.x - 36, pos.y - 128, '1',
+                  phase: Math.random() * 6.28, atkAt: -1e9, flankers: [] };
+      // squad-size badge (×N) shown once reinforced past 1
+      w.badge = this.add.text(pos.x, pos.y - 128, '×1',
         { fontSize: '12px', color: '#fff', fontStyle: 'bold',
-          backgroundColor: '#1a2a5e', padding: { x: 5, y: 2 } }).setDepth(70);
-      if (this.plate) { img.setVisible(false); plat.setVisible(false); }   // painted plate has them
+          backgroundColor: '#7a3a10', padding: { x: 5, y: 2 } }).setOrigin(0.5, 0).setDepth(70);
+      // whole platform column is tappable to reinforce
+      const hit = this.add.zone(pos.x, pos.y - 30, 72, 150).setOrigin(0.5, 0.5)
+        .setInteractive().setDepth(90);
+      hit.on('pointerdown', () => this.cardTap(i));
+      w.hit = hit;
+      if (this.plate) { img.setVisible(false); plat.setVisible(false); w.badge.setVisible(false); }
       else if (!w.deployed) { img.setVisible(false); w.badge.setVisible(false); plat.setAlpha(0.4); }
+      else if (w.count <= 1) w.badge.setVisible(false);
       this.warriors.push(w);
     });
   }
 
-  heroAtk(w) { return Math.round(w.def.atk * 3 * (1 + 0.4 * (w.lvl - 1))); }
-  upCost(w) { return w.deployed ? w.cost + w.lvl : w.cost; }
+  // per-unit attack (each stacked warrior fires its own shot — quantity, not level)
+  heroAtk(w) { return Math.round(w.def.atk * 3); }
+  // rising cost: 1st = base (summon), each reinforcement costs base + units already fielded
+  upCost(w) { return w.deployed ? w.cost + w.count : w.cost; }
 
-  // card tap: summon if empty, upgrade if fielded. Returns a status string for the HUD.
+  // card tap / warrior click: summon if empty, else add a reinforcement (more warriors).
   cardTap(i) {
     if (this.over) return 'over';
     const w = this.warriors[i];
+    if (w.deployed && w.count >= MAX_STACK) { this.toast(w.def.name + ' squad is full (×' + MAX_STACK + ')', '#c8a24a'); return 'full'; }
     const cost = this.upCost(w);
     if (this.elixir < cost) { this.toast('Need ' + cost + ' elixir!', '#7ec8ff'); return 'poor'; }
     this.elixir -= cost;
     if (!w.deployed) {
-      w.deployed = true;
-      if (!this.plate) { w.img.setVisible(true); w.badge.setVisible(true); w.plat.setAlpha(1); }
+      w.deployed = true; w.count = 1;
+      if (!this.plate) { w.img.setVisible(true); w.plat.setAlpha(1); }
       this.summonFx(w);
       this.toast(w.def.name + ' takes the field!', '#ffd24a');
     } else {
-      w.lvl++;
+      w.count++;
+      this.addFlanker(w);
+      w.badge.setVisible(!this.plate).setText('×' + w.count);
       this.summonFx(w);
-      this.toast(w.def.name + ' → Lv ' + w.lvl + '  (⚔ ' + this.heroAtk(w) + ')', '#8be06a');
+      this.toast(w.def.name + ' ×' + w.count + '  reinforced!', '#8be06a');
     }
     this.hudSync(true);
     return 'ok';
+  }
+
+  // add a small flanking warrior figure so the squad visibly grows
+  addFlanker(w) {
+    if (this.plate) return;                         // painted plate can't add figures
+    const slot = w.count - 2;                        // 0..3 for units 2..5
+    const off = [[-24, 4], [24, 4], [-13, -3], [13, -3]][slot] || [0, 0];
+    const f = this.add.image(w.x + off[0], w.y + off[1], w.texKey).setOrigin(0.5, 1);
+    f.setDisplaySize(f.width * (86 / f.height), 86).setDepth(58);
+    this.warriorLayer.add(f);
+    w.flankers.push({ img: f, ox: off[0], oy: off[1] });
   }
 
   summonFx(w) {
@@ -321,6 +346,8 @@ export default class LaneScene extends Phaser.Scene {
         }
         w.img.y = w.y + oy;
         w.img.scaleY = (132 / w.img.height) * sy;
+        // flankers breathe with a phase offset so the squad feels alive
+        w.flankers.forEach((f, k) => { f.img.y = w.y + f.oy + Math.sin(time / 620 + w.phase + k) * 1.0; });
       }
       w.cd -= dt;
       if (w.cd <= 0) {
@@ -329,7 +356,14 @@ export default class LaneScene extends Phaser.Scene {
           if (1 - m.t > w.range) continue;
           if (m.t > bt) { bt = m.t; best = m; }
         }
-        if (best) { w.cd = w.spd; w.atkAt = time; this.fire(w, best); }
+        if (best) {
+          w.cd = w.spd; w.atkAt = time;
+          // ONE volley per stacked warrior — more warriors = more shots (staggered)
+          for (let u = 0; u < w.count; u++) {
+            const ux = w.laneX + (u - (w.count - 1) / 2) * 0.06;
+            this.time.delayedCall(u * 55, () => { if (!this.over) this.fire(w, best, ux); });
+          }
+        }
       }
     }
 
@@ -351,11 +385,13 @@ export default class LaneScene extends Phaser.Scene {
     if (time - (this._hud || 0) > 200) { this._hud = time; this.hudSync(); }
   }
 
-  fire(w, target) {
+  fire(w, target, laneX) {
+    if (!this.enemies.includes(target)) return;   // target may have died during the stagger
+    const lx = laneX == null ? w.laneX : laneX;
     const col = Phaser.Display.Color.HexStringToColor(w.def.pc || '#ffffff').color;
-    const p0 = project(0.97, w.laneX);
+    const p0 = project(0.97, lx);
     const img = this.add.circle(p0.x, p0.y, 3.2, col).setBlendMode(Phaser.BlendModes.ADD);
-    this.projs.push({ t: 0.97, laneX: w.laneX, spd: 1.6, tid: target.id,
+    this.projs.push({ t: 0.97, laneX: lx, spd: 1.6, tid: target.id,
                       dmg: this.heroAtk(w), img, tint: col });
   }
 
@@ -406,9 +442,11 @@ export default class LaneScene extends Phaser.Scene {
     const pips = document.querySelectorAll('#elixbar div');
     pips.forEach((d, i) => d.className = i < Math.floor(this.elixir) ? 'on' : '');
     if (full) this.warriors.forEach((w, i) => {
-      set('cost-' + i, this.upCost(w));
-      set('clvl-' + i, w.deployed ? 'Lv ' + w.lvl : 'SUMMON');
-      if (w.badge) w.badge.setText(String(w.lvl));
+      const maxed = w.deployed && w.count >= MAX_STACK;
+      set('cost-' + i, maxed ? '—' : this.upCost(w));
+      set('clvl-' + i, !w.deployed ? 'SUMMON' : (maxed ? 'MAX ×' + MAX_STACK : '×' + w.count + ' · +1'));
+      const card = document.getElementById('card-' + i);
+      if (card) card.classList.toggle('maxed', maxed);
     });
     set('lane-fps', Math.round(this.game.loop.actualFps) + ' FPS');
     set('lane-count', this.enemies.length + ' enemies');
