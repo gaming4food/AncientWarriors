@@ -27,7 +27,9 @@ export default class LaneScene extends Phaser.Scene {
 
   preload() {
     const D = this.D, art = D.art || { corridor: false, corridorFull: false, back: {} };
-    this.squadDefs = [15, 2, 4, 10, 8].map(id => D.warriors.find(w => w.id === id));
+    // Order matches the painted plate left -> right:
+    // Robin Hood (archer), Joan (knight), Merlin, Viking, Cleopatra
+    this.squadDefs = [2, 15, 4, 10, 8].map(id => D.warriors.find(w => w.id === id));
     this.squadDefs.forEach(w => {
       if (art.back[w.id]) this.load.image('b' + w.id, `../assets/warriors/back/b${w.id}.png`);
       else this.load.image('w' + w.id, `../assets/warriors/w${w.id}.png`);
@@ -103,7 +105,7 @@ export default class LaneScene extends Phaser.Scene {
       this.warriorLayer.add(img);
       const w = { def, img, plat, laneX, x: pos.x, y: pos.y + 26,
                   deployed: this.plate,             // plate mode: painted heroes start fielded
-                  lvl: 1, cost: [3, 2, 3, 4, 3][i],
+                  lvl: 1, cost: [2, 3, 3, 4, 3][i],   // costs follow the painted order
                   cd: 0, spd: def.aspd * 0.55, range: 0.9,
                   phase: Math.random() * 6.28, atkAt: -1e9 };
       w.badge = this.add.text(pos.x - 36, pos.y - 128, '1',
