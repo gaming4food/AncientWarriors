@@ -60,9 +60,15 @@ export default class LaneScene extends Phaser.Scene {
       const s = Math.max(W / src.width, H / src.height);
       this.add.image(W / 2, H / 2, 'corridor_full').setDisplaySize(src.width * s, src.height * s).setDepth(0);
     } else if (this.textures.exists('corridor')) {
+      // clean full scene with the five painted platforms — heroes summon onto them
       const src = this.textures.get('corridor').getSourceImage();
       const s = Math.max(W / src.width, H / src.height);
-      this.add.image(W / 2, H / 2, 'corridor').setDisplaySize(src.width * s, src.height * s).setDepth(0);
+      const dw = src.width * s, dh = src.height * s;
+      this.add.image(W / 2, H / 2, 'corridor').setDisplaySize(dw, dh).setDepth(0);
+      this.paintedPlatforms = true;
+      const offX = (W - dw) / 2;                     // map normalized image coords -> canvas
+      this.px = nx => nx * dw + offX;
+      this.py = ny => ny * dh + (H - dh) / 2;
     } else this.buildCorridor();
 
     this.enemyLayer = this.add.container(0, 0).setDepth(20);
@@ -135,38 +141,53 @@ export default class LaneScene extends Phaser.Scene {
   }
 
   // ── heroes ────────────────────────────────────────────────────────────────
+  // Platform slots — painted octagons on the clean corridor (2 back + 3 front),
+  // matched to the squad order [Robin, Joan, Merlin, Viking, Cleopatra].
+  // Each: normalized image centre + sprite height (back row further -> smaller).
+  slotLayout() {
+    const P = [
+      { nx: 0.175, ny: 0.792, h: 122 },   // Robin  — front-left
+      { nx: 0.308, ny: 0.652, h: 104 },   // Joan   — back-left
+      { nx: 0.500, ny: 0.804, h: 130 },   // Merlin — front-centre
+      { nx: 0.669, ny: 0.652, h: 104 },   // Viking — back-right
+      { nx: 0.792, ny: 0.792, h: 122 },   // Cleo   — front-right
+    ];
+    if (this.paintedPlatforms) return P.map(p => ({ x: this.px(p.nx), y: this.py(p.ny), h: p.h }));
+    // procedural fallback: a single row
+    const lanes = [-0.78, -0.39, 0, 0.39, 0.78];
+    return lanes.map(lx => { const p = project(1, lx); return { x: p.x, y: p.y + 26, h: 132 }; });
+  }
+
   deploySquad() {
     this.warriors = [];
-    const lanes = [-0.78, -0.39, 0, 0.39, 0.78];
+    const slots = this.slotLayout();
     this.squadDefs.forEach((def, i) => {
-      const laneX = lanes[i], pos = project(1, laneX);
-      // glowing hex summon platform (echoes the mockup)
-      const plat = this.add.container(pos.x, pos.y + 30).setDepth(50);
-      const disc = this.add.ellipse(0, 0, 78, 30, 0xffd24a, 0.16).setStrokeStyle(2.5, 0xffe9a0, 0.85);
-      const inner = this.add.ellipse(0, 0, 52, 20, 0xffe9a0, 0.10).setStrokeStyle(1, 0xfff2c0, 0.5);
-      plat.add([disc, inner]);
-      plat.setAlpha(0.5);
+      const S = slots[i];
+      // a subtle glow that lights the painted octagon when the hero is fielded
+      const plat = this.add.container(S.x, S.y).setDepth(48);
+      const disc = this.add.ellipse(0, -2, S.h * 0.62, S.h * 0.24, 0xffe9a0, 0.14)
+        .setStrokeStyle(2, 0xffe9a0, 0.55).setBlendMode(Phaser.BlendModes.ADD);
+      plat.add(disc); plat.setAlpha(0);
       const key = this.textures.exists('b' + def.id) ? 'b' + def.id : 'w' + def.id;
-      const img = this.add.image(pos.x, pos.y + 26, key).setOrigin(0.5, 1);
-      img.setDisplaySize(img.width * (132 / img.height), 132);
+      const img = this.add.image(S.x, S.y, key).setOrigin(0.5, 1);
+      img.setDisplaySize(img.width * (S.h / img.height), S.h);
       this.warriorLayer.add(img);
-      const w = { def, img, plat, laneX, i, x: pos.x, y: pos.y + 26, texKey: key,
-                  deployed: this.plate,             // plate mode: painted heroes start fielded
-                  count: this.plate ? 1 : 0,        // squad size on this platform (0 = not summoned)
-                  cost: [2, 3, 3, 4, 3][i],         // costs follow the painted order
+      const w = { def, img, plat, i, x: S.x, y: S.y, baseH: S.h, texKey: key,
+                  deployed: this.plate,
+                  count: this.plate ? 1 : 0,
+                  cost: [2, 3, 3, 4, 3][i],
                   cd: 0, spd: def.aspd * 0.55, range: 0.9,
                   phase: Math.random() * 6.28, atkAt: -1e9, flankers: [] };
-      // squad-size badge (×N) shown once reinforced past 1
-      w.badge = this.add.text(pos.x, pos.y - 128, '×1',
-        { fontSize: '12px', color: '#fff', fontStyle: 'bold',
+      w.badge = this.add.text(S.x, S.y - S.h - 6, '×1',
+        { fontSize: '11px', color: '#fff', fontStyle: 'bold',
           backgroundColor: '#7a3a10', padding: { x: 5, y: 2 } }).setOrigin(0.5, 0).setDepth(70);
-      // whole platform column is tappable to reinforce
-      const hit = this.add.zone(pos.x, pos.y - 30, 72, 150).setOrigin(0.5, 0.5)
+      // the octagon itself is tappable to summon/reinforce
+      const hit = this.add.zone(S.x, S.y - S.h * 0.4, S.h * 0.7, S.h * 1.1).setOrigin(0.5, 0.5)
         .setInteractive().setDepth(90);
       hit.on('pointerdown', () => this.cardTap(i));
       w.hit = hit;
-      if (this.plate) { img.setVisible(false); plat.setVisible(false); w.badge.setVisible(false); }
-      else if (!w.deployed) { img.setVisible(false); w.badge.setVisible(false); plat.setAlpha(0.4); }
+      if (this.plate) { img.setVisible(false); w.badge.setVisible(false); }
+      else if (!w.deployed) { img.setVisible(false); w.badge.setVisible(false); }
       else if (w.count <= 1) w.badge.setVisible(false);
       this.warriors.push(w);
     });
@@ -187,7 +208,7 @@ export default class LaneScene extends Phaser.Scene {
     this.elixir -= cost;
     if (!w.deployed) {
       w.deployed = true; w.count = 1;
-      if (!this.plate) { w.img.setVisible(true); w.plat.setAlpha(1); }
+      if (!this.plate) { w.img.setVisible(true); w.img.setDepth(w.y); w.plat.setAlpha(0.55); }
       this.summonFx(w);
       this.toast(w.def.name + ' takes the field!', '#ffd24a');
     } else {
@@ -205,11 +226,13 @@ export default class LaneScene extends Phaser.Scene {
   addFlanker(w) {
     if (this.plate) return;                         // painted plate can't add figures
     const slot = w.count - 2;                        // 0..3 for units 2..5
-    const off = [[-24, 4], [24, 4], [-13, -3], [13, -3]][slot] || [0, 0];
-    const f = this.add.image(w.x + off[0], w.y + off[1], w.texKey).setOrigin(0.5, 1);
-    f.setDisplaySize(f.width * (86 / f.height), 86).setDepth(58);
+    const k = w.baseH / 132;                          // scale offsets to this platform's size
+    const off = [[-24, 3], [24, 3], [-13, -4], [13, -4]][slot] || [0, 0];
+    const ox = off[0] * k, oy = off[1] * k, fh = w.baseH * 0.72;
+    const f = this.add.image(w.x + ox, w.y + oy, w.texKey).setOrigin(0.5, 1);
+    f.setDisplaySize(f.width * (fh / f.height), fh).setDepth(w.y - 1);
     this.warriorLayer.add(f);
-    w.flankers.push({ img: f, ox: off[0], oy: off[1] });
+    w.flankers.push({ img: f, ox, oy, fh });
   }
 
   summonFx(w) {
@@ -345,7 +368,7 @@ export default class LaneScene extends Phaser.Scene {
           oy -= push * 7; sy *= 1 + push * 0.05;
         }
         w.img.y = w.y + oy;
-        w.img.scaleY = (132 / w.img.height) * sy;
+        w.img.scaleY = (w.baseH / w.img.height) * sy;
         // flankers breathe with a phase offset so the squad feels alive
         w.flankers.forEach((f, k) => { f.img.y = w.y + f.oy + Math.sin(time / 620 + w.phase + k) * 1.0; });
       }
@@ -360,39 +383,37 @@ export default class LaneScene extends Phaser.Scene {
           w.cd = w.spd; w.atkAt = time;
           // ONE volley per stacked warrior — more warriors = more shots (staggered)
           for (let u = 0; u < w.count; u++) {
-            const ux = w.laneX + (u - (w.count - 1) / 2) * 0.06;
-            this.time.delayedCall(u * 55, () => { if (!this.over) this.fire(w, best, ux); });
+            const ox = (u - (w.count - 1) / 2) * 11;   // px spread across the squad
+            this.time.delayedCall(u * 55, () => { if (!this.over) this.fire(w, best, ox); });
           }
         }
       }
     }
 
-    // projectiles (travel up the lane in depth)
+    // projectiles — screen-space homing from the hero's platform to the target
     for (let i = this.projs.length - 1; i >= 0; i--) {
       const pr = this.projs[i];
-      pr.t -= pr.spd * dt / 1000;
       const tgt = this.enemies.find(m => m.id === pr.tid);
-      if (!tgt || pr.t <= tgt.t) {
-        if (tgt) { tgt.hp -= pr.dmg; this.burst(tgt, true, pr.tint); }
-        pr.img.destroy(); this.projs.splice(i, 1); continue;
-      }
-      // drift laneX toward the target so shots track
-      pr.laneX += (tgt.laneX - pr.laneX) * Math.min(1, dt / 240);
-      const p = project(pr.t, pr.laneX);
-      pr.img.setPosition(p.x, p.y - 20 * p.scale).setScale(p.scale * 1.7).setDepth(55);
+      if (!tgt) { pr.img.destroy(); this.projs.splice(i, 1); continue; }
+      const tp = project(tgt.t, tgt.laneX);
+      const tx = tp.x, ty = tp.y - tgt.baseH * tp.scale * 0.5;
+      const dx = tx - pr.x, dy = ty - pr.y, d = Math.hypot(dx, dy) || 1;
+      if (d < 14) { tgt.hp -= pr.dmg; this.burst(tgt, true, pr.tint); pr.img.destroy(); this.projs.splice(i, 1); continue; }
+      const step = pr.spd * dt / 1000;
+      pr.x += dx / d * step; pr.y += dy / d * step;
+      pr.img.setPosition(pr.x, pr.y);
     }
 
     if (time - (this._hud || 0) > 200) { this._hud = time; this.hudSync(); }
   }
 
-  fire(w, target, laneX) {
+  fire(w, target, ox) {
     if (!this.enemies.includes(target)) return;   // target may have died during the stagger
-    const lx = laneX == null ? w.laneX : laneX;
     const col = Phaser.Display.Color.HexStringToColor(w.def.pc || '#ffffff').color;
-    const p0 = project(0.97, lx);
-    const img = this.add.circle(p0.x, p0.y, 3.2, col).setBlendMode(Phaser.BlendModes.ADD);
-    this.projs.push({ t: 0.97, laneX: lx, spd: 1.6, tid: target.id,
-                      dmg: this.heroAtk(w), img, tint: col });
+    const sx = w.x + (ox || 0), sy = w.y - w.baseH * 0.55;
+    const img = this.add.circle(sx, sy, 3.6, col).setBlendMode(Phaser.BlendModes.ADD).setDepth(56);
+    this.fxLayer.add(img);
+    this.projs.push({ x: sx, y: sy, spd: 560, tid: target.id, dmg: this.heroAtk(w), img, tint: col });
   }
 
   burst(m, small, tint) {
