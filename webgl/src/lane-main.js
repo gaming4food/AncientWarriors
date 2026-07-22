@@ -11,7 +11,8 @@ const gameData = await fetch('./data/game-data.json').then(r => r.json());
 // Order matches the painted plate left -> right: Robin Hood, Joan, Merlin, Viking, Cleopatra
 const SQUAD_IDS = [2, 15, 4, 10, 8];
 const probe = url => fetch(url, { method: 'HEAD' }).then(r => r.ok).catch(() => false);
-const art = { corridor: await probe('../assets/lane/corridor.png'),
+const art = { corridorTop: await probe('../assets/lane/corridor_top.png'),
+              corridor: await probe('../assets/lane/corridor.png'),
               corridorFull: await probe('../assets/lane/corridor_full.png'), back: {} };
 await Promise.all(SQUAD_IDS.map(async id => { art.back[id] = await probe(`../assets/warriors/back/b${id}.png`); }));
 gameData.art = art;

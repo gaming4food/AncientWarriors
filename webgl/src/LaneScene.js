@@ -7,9 +7,10 @@
 // (t, laneX) -> screen x/y/scale so gameplay stays in depth-space.
 
 const W = 375, H = 700;
-const HORIZON_Y = 0.30 * H, NEAR_Y = 0.74 * H;
-const HALF_FAR = 0.055 * W, HALF_NEAR = 0.46 * W;
-const SCALE_FAR = 0.16, SCALE_NEAR = 1.0;
+// Horizon sits at the painted fortress gate; near line at the summon platforms.
+const HORIZON_Y = 0.17 * H, NEAR_Y = 0.775 * H;
+const HALF_FAR = 0.05 * W, HALF_NEAR = 0.45 * W;
+const SCALE_FAR = 0.13, SCALE_NEAR = 1.0;
 const MAX_WAVE = 20, FORT_MAX = 10000;
 const ELIXIR_MAX = 10, ELIXIR_MS = 1400;
 
@@ -34,19 +35,33 @@ export default class LaneScene extends Phaser.Scene {
       if (art.back[w.id]) this.load.image('b' + w.id, `../assets/warriors/back/b${w.id}.png`);
       else this.load.image('w' + w.id, `../assets/warriors/w${w.id}.png`);
     });
-    if (art.corridorFull) this.load.image('corridor_full', '../assets/lane/corridor_full.png');
+    if (art.corridorTop) this.load.image('corridor_top', '../assets/lane/corridor_top.png');
+    else if (art.corridorFull) this.load.image('corridor_full', '../assets/lane/corridor_full.png');
     else if (art.corridor) this.load.image('corridor', '../assets/lane/corridor.png');
     ['goblin', 'skeleton', 'orc', 'shieldbearer', 'ogre', 'boss']
       .forEach(k => this.load.image('e_' + k, `../assets/enemies/${k}.png`));
   }
 
   create() {
-    this.plate = this.textures.exists('corridor_full');
-    const bgKey = this.plate ? 'corridor_full' : (this.textures.exists('corridor') ? 'corridor' : null);
-    if (bgKey) {
-      const src = this.textures.get(bgKey).getSourceImage();
+    // Preferred: painted lane on top (no heroes) + procedural spawn plaza beneath,
+    // so heroes summon in via cards. Falls back to plate / clean / procedural.
+    this.plate = false;
+    if (this.textures.exists('corridor_top')) {
+      const src = this.textures.get('corridor_top').getSourceImage();
+      // cover down to ~72% height so the painted lane is large; crop the outer sides
+      const s = Math.max(W / src.width, (0.72 * H) / src.height);
+      const dw = src.width * s, dh = src.height * s;
+      this.add.image(W / 2, 0, 'corridor_top').setOrigin(0.5, 0).setDisplaySize(dw, dh).setDepth(0);
+      this.buildPlaza(dh);                                   // near foreground stone + platforms
+    } else if (this.textures.exists('corridor_full')) {
+      this.plate = true;
+      const src = this.textures.get('corridor_full').getSourceImage();
       const s = Math.max(W / src.width, H / src.height);
-      this.add.image(W / 2, H / 2, bgKey).setDisplaySize(src.width * s, src.height * s).setDepth(0);
+      this.add.image(W / 2, H / 2, 'corridor_full').setDisplaySize(src.width * s, src.height * s).setDepth(0);
+    } else if (this.textures.exists('corridor')) {
+      const src = this.textures.get('corridor').getSourceImage();
+      const s = Math.max(W / src.width, H / src.height);
+      this.add.image(W / 2, H / 2, 'corridor').setDisplaySize(src.width * s, src.height * s).setDepth(0);
     } else this.buildCorridor();
 
     this.enemyLayer = this.add.container(0, 0).setDepth(20);
@@ -91,14 +106,45 @@ export default class LaneScene extends Phaser.Scene {
     this.add.rectangle(W / 2, HORIZON_Y - 14, 120, 54, 0x6a4a86).setDepth(1).setAlpha(0.95);
   }
 
+  // Procedural near-foreground plaza that continues the painted lane down to the
+  // summon platforms — where the player's heroes spawn in.
+  buildPlaza(fromY) {
+    const g = this.add.graphics().setDepth(1);
+    // warm stone flagstones continuing the painted lane, darkening into the foreground
+    g.fillGradientStyle(0x9c7c4c, 0x9c7c4c, 0x2e2415, 0x2e2415, 1);
+    g.fillRect(0, fromY - 8, W, H - fromY + 8);
+    // converging paving seams toward the vanishing point (perspective)
+    g.lineStyle(1.5, 0x5a4626, 0.55);
+    for (let i = 1; i <= 5; i++) {
+      const yy = fromY + (H - fromY) * (i / 5);
+      g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.strokePath();
+    }
+    // lane rails narrowing to the horizon
+    const nl = project(1, -1.12), nr = project(1, 1.12);
+    g.lineStyle(2.5, 0x7a5e2c, 0.5);
+    g.beginPath(); g.moveTo(nl.x, H); g.lineTo(W / 2 - 30, fromY - 4); g.strokePath();
+    g.beginPath(); g.moveTo(nr.x, H); g.lineTo(W / 2 + 30, fromY - 4); g.strokePath();
+    // seam blend: a soft dark gradient right at the painted-edge to hide the join
+    const seam = this.add.graphics().setDepth(1);
+    seam.fillStyle(0x000000, 0.28); seam.fillRect(0, fromY - 14, W, 22);
+    // bottom vignette
+    const vg = this.add.graphics().setDepth(2);
+    vg.fillStyle(0x000000, 0.4); vg.fillRect(0, H - 90, W, 90);
+    this.plazaTop = fromY;
+  }
+
   // ── heroes ────────────────────────────────────────────────────────────────
   deploySquad() {
     this.warriors = [];
     const lanes = [-0.78, -0.39, 0, 0.39, 0.78];
     this.squadDefs.forEach((def, i) => {
       const laneX = lanes[i], pos = project(1, laneX);
-      const plat = this.add.ellipse(pos.x, pos.y + 26, 74, 26, 0xffd24a, 0.18).setDepth(50);
-      plat.setStrokeStyle(2, 0xffe9a0, 0.75);
+      // glowing hex summon platform (echoes the mockup)
+      const plat = this.add.container(pos.x, pos.y + 30).setDepth(50);
+      const disc = this.add.ellipse(0, 0, 78, 30, 0xffd24a, 0.16).setStrokeStyle(2.5, 0xffe9a0, 0.85);
+      const inner = this.add.ellipse(0, 0, 52, 20, 0xffe9a0, 0.10).setStrokeStyle(1, 0xfff2c0, 0.5);
+      plat.add([disc, inner]);
+      plat.setAlpha(0.5);
       const key = this.textures.exists('b' + def.id) ? 'b' + def.id : 'w' + def.id;
       const img = this.add.image(pos.x, pos.y + 26, key).setOrigin(0.5, 1);
       img.setDisplaySize(img.width * (132 / img.height), 132);
