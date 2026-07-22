@@ -3,6 +3,14 @@
 The lane prototype (`webgl/lane.html`) auto-detects these files and switches from
 placeholders the moment they exist. **Exact filenames matter.**
 
+> **Currently installed:** `assets/lane/corridor_full.png` — the reference mockup
+> (HUD bar cropped) used as a FULL SCENE PLATE: heroes and bars are baked into the
+> image, so the engine hides its own hero sprites and fires from the painted heroes'
+> positions. This is the visual target. The shot list below replaces it with
+> SEPARATED layers (clean background + individual hero sprites) so heroes can be
+> swapped per squad, animate, and show live HP — delete `corridor_full.png` once
+> the separated art is in place.
+
 ## THE SHOT LIST — 6 images total for the full mockup look
 
 | # | File (exact path) | What it is | Size |

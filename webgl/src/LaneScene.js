@@ -37,17 +37,21 @@ export default class LaneScene extends Phaser.Scene {
       if (art.back[w.id]) this.load.image('b' + w.id, `../assets/warriors/back/b${w.id}.png`);
       else this.load.image('w' + w.id, `../assets/warriors/w${w.id}.png`);
     });
-    if (art.corridor) this.load.image('corridor', '../assets/lane/corridor.png');
+    if (art.corridorFull) this.load.image('corridor_full', '../assets/lane/corridor_full.png');
+    else if (art.corridor) this.load.image('corridor', '../assets/lane/corridor.png');
     ['goblin', 'skeleton', 'orc', 'shieldbearer', 'ogre', 'boss']
       .forEach(k => this.load.image('e_' + k, `../assets/enemies/${k}.png`));
   }
 
   create() {
-    // painted corridor when the file exists (cover-fit), procedural stand-in otherwise
-    if (this.textures.exists('corridor')) {
-      const src = this.textures.get('corridor').getSourceImage();
+    // Background priority: full scene plate (heroes baked in) > clean painted
+    // corridor > procedural stand-in. The plate hides the engine's hero visuals.
+    this.plate = this.textures.exists('corridor_full');
+    const bgKey = this.plate ? 'corridor_full' : (this.textures.exists('corridor') ? 'corridor' : null);
+    if (bgKey) {
+      const src = this.textures.get(bgKey).getSourceImage();
       const s = Math.max(W / src.width, H / src.height);
-      this.add.image(W / 2, H / 2, 'corridor')
+      this.add.image(W / 2, H / 2, bgKey)
         .setDisplaySize(src.width * s, src.height * s).setDepth(0);
     } else {
       this.buildCorridor();
@@ -136,6 +140,10 @@ export default class LaneScene extends Phaser.Scene {
       w.badge = this.add.text(pos.x - 34, pos.y - 126, String(w.lvl),
         { fontSize: '11px', color: '#fff', fontStyle: 'bold',
           backgroundColor: '#1a2a5e', padding: { x: 4, y: 2 } }).setDepth(70);
+      // Scene plate: the painted heroes/bars ARE the visuals — hide the engine's,
+      // but keep the warrior alive so it still fires from this platform.
+      if (this.plate) { img.setVisible(false); plat.setVisible(false);
+        w.bar.bg.setVisible(false); w.bar.fill.setVisible(false); w.badge.setVisible(false); }
       this.warriors.push(w);
     });
   }
