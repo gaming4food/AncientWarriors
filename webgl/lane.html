@@ -128,6 +128,80 @@
   #mn-toast{position:absolute;bottom:66px;left:50%;transform:translateX(-50%);background:rgba(10,7,4,0.92);
     border:1px solid #8a6a10;border-radius:9px;padding:8px 16px;font-size:12px;font-weight:800;color:#ffd700;
     opacity:0;transition:opacity .2s;pointer-events:none}
+
+  /* ── META SCREENS (My Warriors / Market / Castle / Armory) ── */
+  #screen{position:absolute;inset:0;z-index:35;display:none;flex-direction:column;
+    background:radial-gradient(ellipse at 50% 12%,#20140a,#0b0906 78%)}
+  #screen.on{display:flex}
+  .sc-hdr{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1.5px solid #3a2a0a;flex-shrink:0}
+  .sc-hdr .back{font-size:24px;color:#d4a017;cursor:pointer;width:26px;line-height:1}
+  .sc-hdr h2{flex:1;font-family:Georgia,serif;font-size:19px;font-weight:900;color:#ffd700;margin:0;letter-spacing:0.5px}
+  .sc-gold{font-size:13px;font-weight:800;color:#ffd700}
+  .sc-sub{font-size:11px;color:#a07830;font-weight:700}
+  #sc-body{flex:1;overflow-y:auto;padding:10px;-webkit-overflow-scrolling:touch}
+  #sc-body::-webkit-scrollbar{width:0}
+
+  /* collection grid (My Warriors) */
+  .wgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .wcard{position:relative;border:2px solid #4b463c;background:#1b1813;border-radius:11px;padding:7px 7px 8px;
+    display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;overflow:hidden}
+  .wcard.sel{outline:2px solid #ffd700;outline-offset:-1px}
+  .wcard.tgt{outline:2px solid #7ec8ff;outline-offset:-1px}
+  .wc-badge{position:absolute;top:5px;right:5px;font-size:7.5px;font-weight:800;padding:1px 5px;border-radius:5px;letter-spacing:0.4px;color:#fff}
+  .rc{background:#4b463c}.ru{background:#3a6f9e}.rr{background:#b0761f}.rq{background:#8a45c8}.re{background:#a63ad0}.rl2{background:#c8a017;color:#241a04}.rm{background:#ff2d95}
+  .wc-team{position:absolute;top:5px;left:5px;font-size:8px;font-weight:800;color:#0b0906;background:#8be06a;border-radius:5px;padding:1px 5px}
+  .wc-img{width:66px;height:66px;border-radius:8px;object-fit:cover;object-position:top;background:#0d0a06;border:1px solid #2a2018}
+  .wc-name{font-size:12px;font-weight:800;color:#ffe9a0;text-align:center;line-height:1.05}
+  .wc-star{color:#ffd700;font-size:10px}
+  .wc-stars{font-size:10px;letter-spacing:1px}
+  .wc-lv{font-size:9px;color:#c8a24a;font-weight:700}
+  .xpbar{width:100%;height:5px;background:#0d0a06;border-radius:3px;overflow:hidden;border:1px solid #2a2018}
+  .xpbar i{display:block;height:100%;background:linear-gradient(90deg,#3ca0ff,#7ee0ff)}
+  .wc-stats{display:flex;gap:5px;width:100%;justify-content:center;font-size:8.5px;color:#bfa;margin-top:1px}
+  .wc-stats span{color:#e8d0a0;font-weight:700}
+  .wc-ab{font-size:8px;line-height:1.25;text-align:center}
+  .wc-btn{margin-top:2px;width:100%;font-size:9px;font-weight:800;padding:5px 0;border-radius:7px;
+    border:1px solid #5a4410;background:#12100a;color:#d4a017;cursor:pointer;font-family:inherit}
+  .wc-btn:active{filter:brightness(1.4)}
+  .wc-btn.asc{color:#ffd700;border-color:#8a6a10}
+  .wc-btn.feed{color:#7ec8ff;border-color:#2a4a66}
+
+  /* market */
+  .mk-card{background:#1a0e04;border:2px solid #3a2a0a;border-radius:16px;padding:16px 18px;margin-bottom:12px;
+    display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;cursor:pointer}
+  .mk-card:active{border-color:#d4a017}
+  .mk-ic{font-size:34px}
+  .mk-name{font-size:17px;font-weight:800;color:#ffd700}
+  .mk-desc{font-size:11px;color:#a07830;line-height:1.5;max-width:270px}
+  .mk-cost{font-size:14px;font-weight:800;color:#d4a017;background:#0d0a06;padding:6px 18px;border-radius:9px;border:1px solid #2a1a08}
+  .mk-cost.off{opacity:0.5}
+
+  /* reveal */
+  #reveal{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;background:rgba(4,2,8,0.92);cursor:pointer}
+  #reveal.on{display:flex}
+  #rv-card{width:190px;border:3px solid #c8a017;border-radius:16px;background:#1b1813;padding:16px;
+    display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 0 34px rgba(255,215,0,0.4);
+    animation:rvpop .5s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes rvpop{0%{transform:scale(0.4) rotate(-8deg);opacity:0}100%{transform:scale(1);opacity:1}}
+  #rv-card img{width:120px;height:120px;object-fit:cover;object-position:top;border-radius:10px;background:#0d0a06}
+  #rv-rar{font-size:13px;font-weight:900;letter-spacing:1px}
+  #rv-name{font-size:20px;font-weight:900;color:#ffd700}
+  #rv-tap{font-size:10px;color:#a07830}
+
+  /* castle */
+  .bs-card{background:#1a0e04;border:2px solid #3a2a0a;border-radius:14px;padding:13px 14px;margin-bottom:11px;
+    display:flex;align-items:center;gap:12px}
+  .bs-ic{font-size:30px;width:44px;text-align:center;flex-shrink:0}
+  .bs-tx{flex:1;min-width:0}
+  .bs-t{font-size:14px;font-weight:800;color:#ffd700}
+  .bs-d{font-size:10px;color:#a07830;line-height:1.4;margin-top:2px}
+  .bs-next{font-size:9px;color:#6a8ad0;margin-top:2px;font-weight:700}
+  .bs-btn{background:linear-gradient(135deg,#c8920f,#ffd700);color:#241a04;border:none;border-radius:9px;
+    font-size:12px;font-weight:800;padding:9px 13px;cursor:pointer;font-family:inherit;flex-shrink:0}
+  .bs-btn:disabled{opacity:0.4;filter:grayscale(0.6);cursor:default}
+  .bs-max{color:#8be06a;font-size:13px;font-weight:800;flex-shrink:0}
+  .sc-empty{text-align:center;color:#6a5a3a;font-size:12px;padding:40px 20px;line-height:1.6}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 </head>
@@ -166,25 +240,25 @@
           <div class="mb-tx"><div class="mb-t">ADVENTURE</div><div class="mb-s">March through history. Conquer nations.</div></div>
           <div class="mb-ch">›</div>
         </div>
-        <div class="mbtn" onclick="AWLANE.menuToast('🛡️ My Warriors — porting from the classic build')">
+        <div class="mbtn" onclick="AWLANE.openScreen('warriors')">
           <div class="mb-ic">🛡️</div>
           <div class="mb-tx"><div class="mb-t">MY WARRIORS</div><div class="mb-s">Manage and Enhance your Heroes.</div></div>
-          <div class="mb-soon">SOON</div>
+          <div class="mb-ch">›</div>
         </div>
-        <div class="mbtn" onclick="AWLANE.menuToast('🏺 Warriors Market — porting from the classic build')">
+        <div class="mbtn" onclick="AWLANE.openScreen('market')">
           <div class="mb-ic">🏺</div>
           <div class="mb-tx"><div class="mb-t">WARRIORS MARKET</div><div class="mb-s">Recruit Heroes and Get Resources.</div></div>
-          <div class="mb-soon">SOON</div>
+          <div class="mb-ch">›</div>
         </div>
-        <div class="mbtn" onclick="AWLANE.menuToast('🏰 Castle Upgrades — porting from the classic build')">
+        <div class="mbtn" onclick="AWLANE.openScreen('castle')">
           <div class="mb-ic">🏰</div>
           <div class="mb-tx"><div class="mb-t">CASTLE UPGRADES</div><div class="mb-s">Fortify your Base. Grow Stronger.</div></div>
-          <div class="mb-soon">SOON</div>
+          <div class="mb-ch">›</div>
         </div>
-        <div class="mbtn" onclick="AWLANE.menuToast('⚒️ Armory — porting from the classic build')">
+        <div class="mbtn" onclick="AWLANE.openScreen('armory')">
           <div class="mb-ic">⚒️</div>
           <div class="mb-tx"><div class="mb-t">ARMORY</div><div class="mb-s">Equip Armor &amp; Weapons. Complete Sets.</div></div>
-          <div class="mb-soon">SOON</div>
+          <div class="mb-ch">›</div>
         </div>
       </div>
       <div class="mn-nav">
@@ -195,6 +269,27 @@
         <div class="nav-it" onclick="AWLANE.menuToast('✉️ No new mail')"><span class="nv-ic">✉️</span><span>MAIL</span></div>
       </div>
       <div id="mn-toast"></div>
+    </div>
+
+    <!-- Meta screens: My Warriors / Warriors Market / Castle Upgrades / Armory -->
+    <div id="screen">
+      <div class="sc-hdr">
+        <span class="back" onclick="AWLANE.closeScreen()">‹</span>
+        <h2 id="sc-title">—</h2>
+        <span class="sc-gold" id="sc-gold">🪙 0</span>
+      </div>
+      <div id="sc-body"></div>
+    </div>
+
+    <!-- Recruit reveal card -->
+    <div id="reveal" onclick="AWLANE.closeReveal()">
+      <div id="rv-card">
+        <div id="rv-rar">—</div>
+        <img id="rv-img" src="" alt="">
+        <div id="rv-name">—</div>
+        <div id="rv-stars" class="wc-stars"></div>
+      </div>
+      <div id="rv-tap">tap to continue</div>
     </div>
 
     <div class="ui" id="topbar">

@@ -35,12 +35,15 @@ export default class LaneScene extends Phaser.Scene {
 
   preload() {
     const D = this.D, art = D.art || { corridor: false, corridorFull: false, back: {} };
-    // Order matches the painted plate left -> right:
-    // Robin Hood (archer), Joan (knight), Merlin, Viking, Cleopatra
-    this.squadDefs = [2, 15, 4, 10, 8].map(id => D.warriors.find(w => w.id === id));
+    // Squad chosen in My Warriors (registry), falling back to the default five.
+    const byId = id => D.warriors.find(w => w.id === id) || D.mythics.find(m => m.id === id);
+    const ids = (this.game.registry.get('squad') || [2, 15, 4, 10, 8]).slice(0, 5);
+    this.squadDefs = ids.map(byId).filter(Boolean);
+    if (!this.squadDefs.length) this.squadDefs = [2, 15, 4, 10, 8].map(byId);
     this.squadDefs.forEach(w => {
-      if (art.back[w.id]) this.load.image('b' + w.id, `../assets/warriors/back/b${w.id}.png`);
-      else this.load.image('w' + w.id, `../assets/warriors/w${w.id}.png`);
+      const pfx = w.id >= 100 ? 'm' : 'w';              // mythic vs base sprite file
+      if (art.back && art.back[w.id]) this.load.image('h' + w.id, `../assets/warriors/back/b${w.id}.png`);
+      else this.load.image('h' + w.id, `../assets/warriors/${pfx}${w.id}.png`);
     });
     if (art.corridorTop) this.load.image('corridor_top', '../assets/lane/corridor_top.png');
     else if (art.corridorFull) this.load.image('corridor_full', '../assets/lane/corridor_full.png');
@@ -85,9 +88,16 @@ export default class LaneScene extends Phaser.Scene {
 
     // ── game state ──
     this.enemies = []; this.projs = []; this.eid = 0;
-    this.enemyFortress = FORT_MAX; this.yourFortress = FORT_MAX;
+    // Castle Upgrades carry into battle: Golden Gate → sturdier player fortress,
+    // Elixir Well → faster regen + more starting elixir. Read from the registry.
+    const reg = this.game.registry;
+    const baseLvl = reg.get('baseLvl') || 1;
+    this.enemyFortMax = FORT_MAX;
+    this.yourFortMax = Math.round(FORT_MAX * (1 + 0.15 * (baseLvl - 1)));   // +15% HP per Gate level
+    this.enemyFortress = this.enemyFortMax; this.yourFortress = this.yourFortMax;
+    this.elixRegenMs = reg.get('wellRegenMs') || ELIXIR_MS;
     this.gold = 350; this.gems = 180; this.kills = 0;
-    this.elixir = 7; this.elixAcc = 0;
+    this.elixir = reg.get('startElixir') || 7; this.elixAcc = 0;
     this.wave = 0; this.waveSpawned = 0; this.waveKilled = 0; this.waveTarget = 0;
     this.spawnAcc = 0; this.over = false; this.speed = 1;
 
@@ -494,7 +504,7 @@ export default class LaneScene extends Phaser.Scene {
 
     // elixir regen
     this.elixAcc += dt;
-    while (this.elixAcc >= ELIXIR_MS) { this.elixAcc -= ELIXIR_MS; this.elixir = Math.min(ELIXIR_MAX, this.elixir + 1); }
+    while (this.elixAcc >= this.elixRegenMs) { this.elixAcc -= this.elixRegenMs; this.elixir = Math.min(ELIXIR_MAX, this.elixir + 1); }
 
     // wave spawner
     this.spawnAcc += dt;
@@ -766,10 +776,10 @@ export default class LaneScene extends Phaser.Scene {
     set('hud-gold', this.gold); set('hud-gems', this.gems);
     set('hud-kills', this.waveKilled + ' / ' + this.waveTarget);
     set('hud-wave', 'WAVE ' + this.wave + ' / ' + MAX_WAVE);
-    set('ef-hp', this.enemyFortress + ' / ' + FORT_MAX);
-    set('yf-hp', this.yourFortress + ' / ' + FORT_MAX);
-    const bar = (id, cur) => { const e = document.getElementById(id); if (e) e.style.width = (cur / FORT_MAX * 100) + '%'; };
-    bar('ef-fill', this.enemyFortress); bar('yf-fill', this.yourFortress);
+    set('ef-hp', this.enemyFortress + ' / ' + this.enemyFortMax);
+    set('yf-hp', this.yourFortress + ' / ' + this.yourFortMax);
+    const bar = (id, cur, max) => { const e = document.getElementById(id); if (e) e.style.width = (cur / max * 100) + '%'; };
+    bar('ef-fill', this.enemyFortress, this.enemyFortMax); bar('yf-fill', this.yourFortress, this.yourFortMax);
     set('elixnum', Math.floor(this.elixir));
     this.syncSpellBtns();
     const pips = document.querySelectorAll('#elixbar div');
