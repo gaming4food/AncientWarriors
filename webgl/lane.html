@@ -87,6 +87,47 @@
   #dbg{top:38px;left:8px;font-size:9px;color:#8be06a;font-weight:800;text-shadow:0 1px 2px #000;z-index:5}
   .note{width:375px;font-size:10px;color:#8a7a5a;line-height:1.5}
   b.g{color:#ffd700}
+
+  /* ── MAIN MENU (original shell) ── */
+  #menu{position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;
+    background:radial-gradient(ellipse at 50% 20%,#261607,#0b0906 74%);overflow:hidden}
+  .mn-top{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px 4px;flex-shrink:0}
+  .mn-port{width:40px;height:40px;border-radius:9px;border:2px solid #8a6a10;overflow:hidden;flex-shrink:0;background:#12100a}
+  .mn-port img{width:100%;height:100%;object-fit:cover;object-position:top}
+  .mn-pinfo{flex:1;min-width:0}
+  .mn-pname{font-size:13px;font-weight:900;color:#ffd700}
+  .mn-plvl{font-size:9px;color:#a07830;font-weight:700}
+  .mn-cur{display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+  .mn-cur span{font-size:11px;font-weight:800;color:#e8d0a0}
+  .mn-gear{font-size:20px;cursor:pointer}
+  .mn-logo{text-align:center;margin:4px 0 6px;flex-shrink:0}
+  .mn-logo h1{font-family:Georgia,serif;font-size:34px;line-height:0.92;font-weight:900;letter-spacing:2px;margin:0;
+    background:linear-gradient(180deg,#ffe9a0,#f5c845 38%,#9a6410 68%,#e8b83a);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 2px 1px rgba(0,0,0,0.85)) drop-shadow(0 0 16px rgba(212,160,23,0.35))}
+  .mn-logo .sm{font-size:22px;letter-spacing:6px}
+  .mn-logo p{font-size:9px;color:#d4a017;letter-spacing:3px;margin:4px 0 0;font-weight:700}
+  .mn-art{width:340px;height:118px;border:2px solid #8a6a10;border-radius:12px;overflow:hidden;flex-shrink:0;
+    box-shadow:0 0 16px rgba(212,160,23,0.25);display:flex;background:#120a10}
+  .mn-art img{flex:1;height:100%;object-fit:cover;object-position:top}
+  .mn-btns{display:flex;flex-direction:column;gap:6px;width:340px;flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 0 2px}
+  .mn-btns::-webkit-scrollbar{display:none}
+  .mbtn{display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#221708,#150e05);border:1.5px solid #5a4410;border-radius:12px;padding:6px 12px;cursor:pointer;flex-shrink:0}
+  .mbtn:active{filter:brightness(1.35)}
+  .mbtn.primary{border:2px solid #ffd700;background:linear-gradient(180deg,#342108,#1d1305);box-shadow:0 0 16px rgba(255,215,0,0.35)}
+  .mb-ic{font-size:22px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#12100a;border:1px solid #3a2a0a;border-radius:9px;flex-shrink:0}
+  .mb-tx{flex:1;min-width:0}
+  .mb-t{font-size:16px;font-weight:900;color:#d4a017;letter-spacing:1px}
+  .mbtn.primary .mb-t{color:#ffd700}
+  .mb-s{font-size:9px;color:#a07830}
+  .mb-ch{color:#8a6a30;font-size:18px}
+  .mb-soon{font-size:7px;color:#6a5a3a;border:1px solid #3a2e18;border-radius:5px;padding:1px 4px;letter-spacing:0.5px}
+  .mn-nav{display:flex;width:100%;margin-top:auto;background:linear-gradient(180deg,rgba(23,16,6,0.6),#0b0906);border-top:1.5px solid #3a2a0a;padding:8px 2px 12px;flex-shrink:0}
+  .nav-it{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:7px;color:#c8a24a;font-weight:700;cursor:pointer;text-align:center}
+  .nav-it:active{filter:brightness(1.5)}
+  .nav-it .nv-ic{font-size:17px}
+  #mn-toast{position:absolute;bottom:66px;left:50%;transform:translateX(-50%);background:rgba(10,7,4,0.92);
+    border:1px solid #8a6a10;border-radius:9px;padding:8px 16px;font-size:12px;font-weight:800;color:#ffd700;
+    opacity:0;transition:opacity .2s;pointer-events:none}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 </head>
@@ -94,6 +135,67 @@
 <div id="wrap">
   <div id="stage">
     <div id="game"></div>
+
+    <!-- Main menu shell (original options) -->
+    <div id="menu">
+      <div class="mn-top">
+        <div class="mn-port"><img src="../assets/warriors/w15.png" alt=""></div>
+        <div class="mn-pinfo">
+          <div class="mn-pname">Commander</div>
+          <div class="mn-plvl">Glory Level 1</div>
+        </div>
+        <div class="mn-cur">
+          <span id="mn-gold">🪙 350</span>
+          <span id="mn-gems">💎 180</span>
+        </div>
+        <div class="mn-gear" onclick="AWLANE.menuToast('⚙️ Settings — coming soon')">⚙️</div>
+      </div>
+      <div class="mn-logo">
+        <h1><span class="sm">ANCIENT</span><br>WARRIORS</h1>
+        <p>🔥 — LEGENDS OF BATTLE — 🔥</p>
+      </div>
+      <div class="mn-art" id="mn-art"></div>
+      <div class="mn-btns">
+        <div class="mbtn primary" onclick="AWLANE.play()">
+          <div class="mb-ic">⚔️</div>
+          <div class="mb-tx"><div class="mb-t">ENTER BATTLE</div><div class="mb-s">March the corridor. Raze the fortress.</div></div>
+          <div class="mb-ch">›</div>
+        </div>
+        <div class="mbtn" onclick="AWLANE.play()">
+          <div class="mb-ic">📖</div>
+          <div class="mb-tx"><div class="mb-t">ADVENTURE</div><div class="mb-s">March through history. Conquer nations.</div></div>
+          <div class="mb-ch">›</div>
+        </div>
+        <div class="mbtn" onclick="AWLANE.menuToast('🛡️ My Warriors — porting from the classic build')">
+          <div class="mb-ic">🛡️</div>
+          <div class="mb-tx"><div class="mb-t">MY WARRIORS</div><div class="mb-s">Manage and Enhance your Heroes.</div></div>
+          <div class="mb-soon">SOON</div>
+        </div>
+        <div class="mbtn" onclick="AWLANE.menuToast('🏺 Warriors Market — porting from the classic build')">
+          <div class="mb-ic">🏺</div>
+          <div class="mb-tx"><div class="mb-t">WARRIORS MARKET</div><div class="mb-s">Recruit Heroes and Get Resources.</div></div>
+          <div class="mb-soon">SOON</div>
+        </div>
+        <div class="mbtn" onclick="AWLANE.menuToast('🏰 Castle Upgrades — porting from the classic build')">
+          <div class="mb-ic">🏰</div>
+          <div class="mb-tx"><div class="mb-t">CASTLE UPGRADES</div><div class="mb-s">Fortify your Base. Grow Stronger.</div></div>
+          <div class="mb-soon">SOON</div>
+        </div>
+        <div class="mbtn" onclick="AWLANE.menuToast('⚒️ Armory — porting from the classic build')">
+          <div class="mb-ic">⚒️</div>
+          <div class="mb-tx"><div class="mb-t">ARMORY</div><div class="mb-s">Equip Armor &amp; Weapons. Complete Sets.</div></div>
+          <div class="mb-soon">SOON</div>
+        </div>
+      </div>
+      <div class="mn-nav">
+        <div class="nav-it" onclick="AWLANE.menuToast('🎁 Daily reward claimed!')"><span class="nv-ic">🎁</span><span>DAILY</span></div>
+        <div class="nav-it" onclick="AWLANE.menuToast('🪖 Achievements — coming soon')"><span class="nv-ic">🪖</span><span>ACHIEVE</span></div>
+        <div class="nav-it" onclick="AWLANE.menuToast('📜 Battle Codex — coming soon')"><span class="nv-ic">📜</span><span>CODEX</span></div>
+        <div class="nav-it" onclick="AWLANE.menuToast('👑 Rankings — coming soon')"><span class="nv-ic">👑</span><span>RANKINGS</span></div>
+        <div class="nav-it" onclick="AWLANE.menuToast('✉️ No new mail')"><span class="nv-ic">✉️</span><span>MAIL</span></div>
+      </div>
+      <div id="mn-toast"></div>
+    </div>
 
     <div class="ui" id="topbar">
       <span class="chip">🪙 <b id="hud-gold">350</b></span>
@@ -133,7 +235,10 @@
     <div id="endov">
       <div id="end-title2">🏆 VICTORY!</div>
       <div id="end-msg"></div>
-      <button onclick="location.reload()">⚔ Battle Again</button>
+      <div style="display:flex;gap:10px">
+        <button onclick="AWLANE.play()">⚔ Battle Again</button>
+        <button onclick="AWLANE.menu()" style="background:#1a1208;color:#d4a017;border:1.5px solid #5a4410">← Main Menu</button>
+      </div>
     </div>
   </div>
   <div class="note">

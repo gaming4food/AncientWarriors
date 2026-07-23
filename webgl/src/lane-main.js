@@ -28,6 +28,8 @@ const game = new Phaser.Game({
   render: { antialias: true },
   scene: [LaneScene],
 });
+// The scene's update idles while registry 'running' is false — the MAIN MENU shows first.
+game.registry.set('running', false);
 game.scene.start('lane', { gameData });
 
 // Build the card tray from the same squad the scene fields
@@ -47,11 +49,41 @@ SQUAD_IDS.forEach((id, i) => {
 const bar = document.getElementById('elixbar');
 for (let i = 0; i < 10; i++) bar.appendChild(document.createElement('div'));
 
+// Menu hero-lineup art (the fielded squad, front-view portraits)
+const mnArt = document.getElementById('mn-art');
+SQUAD_IDS.forEach(id => {
+  const im = document.createElement('img');
+  im.src = `../assets/warriors/w${id}.png`;
+  mnArt.appendChild(im);
+});
+
+let _toastT = null;
 window.AWLANE = {
   scene: () => game.scene.getScene('lane'),
   renderer: () => (game.renderer.type === Phaser.WEBGL ? 'WEBGL' : 'CANVAS'),
   card(i) { this.scene().cardTap(i); },
   arm(key) { this.scene().armSpell(key); },
+  // ── menu <-> battle flow ──
+  play() {                                   // Enter Battle: fresh run, hide menu
+    document.getElementById('endov').style.display = 'none';
+    document.getElementById('menu').style.display = 'none';
+    game.scene.stop('lane');
+    game.scene.start('lane', { gameData });
+    game.registry.set('running', true);
+    document.getElementById('pausebtn').textContent = '❚❚';
+    document.getElementById('spdbtn').textContent = '1X';
+  },
+  menu() {                                   // back to the main menu
+    document.getElementById('endov').style.display = 'none';
+    game.registry.set('running', false);
+    document.getElementById('menu').style.display = 'flex';
+  },
+  menuToast(txt) {
+    const t = document.getElementById('mn-toast');
+    if (!t) return;
+    t.textContent = txt; t.style.opacity = '1';
+    clearTimeout(_toastT); _toastT = setTimeout(() => { t.style.opacity = '0'; }, 1700);
+  },
   pause() {
     const paused = this.scene().togglePause();
     document.getElementById('pausebtn').textContent = paused ? '▶' : '❚❚';

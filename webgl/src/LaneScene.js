@@ -489,7 +489,7 @@ export default class LaneScene extends Phaser.Scene {
 
   // ── frame ────────────────────────────────────────────────────────────────
   update(time, rawDt) {
-    if (this.over) return;
+    if (this.over || !this.game.registry.get('running')) return;   // idle while the menu is up
     const dt = Math.min(rawDt, 50) * this.speed;
 
     // elixir regen
