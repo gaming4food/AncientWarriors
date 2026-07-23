@@ -88,9 +88,18 @@ export default class LaneScene extends Phaser.Scene {
     this.enemyFortress = FORT_MAX; this.yourFortress = FORT_MAX;
     this.gold = 350; this.gems = 180; this.kills = 0;
     this.elixir = 7; this.elixAcc = 0;
-    this.spellCharges = 3;
     this.wave = 0; this.waveSpawned = 0; this.waveKilled = 0; this.waveTarget = 0;
     this.spawnAcc = 0; this.over = false; this.speed = 1;
+
+    // ── commander spells (user-aimed) ──
+    this.spells = {
+      boulder: { icon: '🪨', kind: 'boulder', ch: 3, max: 3, radius: 62, dmg: 700, col: 0xc8a060 },
+      meteor:  { icon: '☄️', kind: 'meteor',  ch: 2, max: 2, radius: 56, dmg: 1200, col: 0xff7a30 },
+      frost:   { icon: '❄️', kind: 'frost',   ch: 2, max: 2, radius: 78, freeze: 2800, dmg: 180, col: 0x8fd8ff },
+    };
+    this.armed = null; this.aiming = false;
+    this.setupSpellInput();
+    this.slingBase = { x: W / 2, y: H - 96 };   // slingshot launch origin (near player)
 
     this.deploySquad();
     this.nextWave();
@@ -211,7 +220,7 @@ export default class LaneScene extends Phaser.Scene {
 
   // card tap / warrior click: summon → reinforce (×5) → ASCEND (rank up) → reinforce again…
   cardTap(i) {
-    if (this.over) return 'over';
+    if (this.over || this.armed) return 'armed';   // aiming a spell — don't summon
     const w = this.warriors[i];
     // full stack + can rank up → this action ascends instead of reinforcing
     if (this.canAscend(w)) return this.ascend(w);
@@ -298,18 +307,127 @@ export default class LaneScene extends Phaser.Scene {
     }
   }
 
-  castSpell() {
-    if (this.over || this.spellCharges <= 0) return;
-    this.spellCharges--;
-    const dmg = 600 + this.wave * 120;
-    this.cameras.main.shake(220, 0.012);
-    for (const m of [...this.enemies]) {
-      m.hp -= dmg;
-      const p = project(m.t, m.laneX);
-      this.burst({ t: m.t, laneX: m.laneX }, false, 0xffb020);
+  // ── COMMANDER SPELLS — user-aimed ─────────────────────────────────────────
+  setupSpellInput() {
+    this.reticle = this.add.container(0, 0).setDepth(96).setVisible(false);
+    const ring = this.add.graphics(); this.reticle.add(ring); this.reticle.ring = ring;
+    this.arc = this.add.graphics().setDepth(95);   // slingshot trajectory preview
+    this.input.on('pointerdown', p => {
+      if (!this.armed || this.over || p.y > H - 132) return;   // ignore taps on the tray
+      this.aiming = true; this.updateAim(p.x, p.y);
+    });
+    this.input.on('pointermove', p => { if (this.aiming) this.updateAim(p.x, p.y); });
+    this.input.on('pointerup', p => { if (this.aiming) { this.aiming = false; this.castArmed(p.x, p.y); } });
+  }
+  armSpell(key) {
+    if (this.over) return;
+    const sp = this.spells[key];
+    if (sp.ch <= 0) { this.toast(sp.icon + ' recharging — clear a wave', '#c8a24a'); return; }
+    this.armed = (this.armed === key) ? null : key;      // toggle
+    this.reticle.setVisible(false); this.arc.clear();
+    this.syncSpellBtns();
+    if (this.armed) this.toast('Aim ' + sp.icon + ' — drag on the battlefield', sp.col && '#ffe9a0');
+  }
+  updateAim(x, y) {
+    const sp = this.spells[this.armed]; if (!sp) return;
+    y = Phaser.Math.Clamp(y, HORIZON_Y, H - 132);
+    this.aimX = x; this.aimY = y;
+    const r = sp.radius;
+    this.reticle.setPosition(x, y).setVisible(true);
+    const g = this.reticle.ring; g.clear();
+    g.lineStyle(2.5, sp.col, 0.9); g.strokeEllipse(0, 0, r * 2, r * 0.8);
+    g.lineStyle(1.5, 0xffffff, 0.6); g.lineBetween(-10, 0, 10, 0); g.lineBetween(0, -6, 0, 6);
+    // slingshot trajectory arc from the launch origin
+    this.arc.clear();
+    if (sp.kind === 'boulder') {
+      this.arc.lineStyle(2, 0xffe9a0, 0.5);
+      const o = this.slingBase, mx = (o.x + x) / 2, my = Math.min(o.y, y) - 120;
+      this.arc.beginPath(); this.arc.moveTo(o.x, o.y);
+      for (let t = 0.1; t <= 1; t += 0.1) {
+        const bx = (1 - t) * (1 - t) * o.x + 2 * (1 - t) * t * mx + t * t * x;
+        const by = (1 - t) * (1 - t) * o.y + 2 * (1 - t) * t * my + t * t * y;
+        this.arc.lineTo(bx, by);
+      }
+      this.arc.strokePath();
     }
-    this.toast('⚡ JUDGEMENT — ' + dmg + ' to all foes!', '#ffb020');
+  }
+  castArmed(x, y) {
+    const key = this.armed, sp = this.spells[key];
+    this.armed = null; this.reticle.setVisible(false); this.arc.clear(); this.syncSpellBtns();
+    if (!sp || sp.ch <= 0 || this.over) return;
+    y = Phaser.Math.Clamp(y, HORIZON_Y, H - 132);
+    sp.ch--;
+    if (sp.kind === 'boulder') this.castBoulder(x, y, sp);
+    else if (sp.kind === 'meteor') this.castMeteor(x, y, sp);
+    else if (sp.kind === 'frost') this.castFrost(x, y, sp);
     this.hudSync(true);
+  }
+  // radius-based AoE in screen space (matches the reticle the player aimed)
+  aoeDamage(x, y, radius, dmg) {
+    let hits = 0;
+    for (const m of this.enemies) {
+      const p = project(m.t, m.laneX);
+      if (Math.hypot(p.x - x, p.y - y - m.baseH * p.scale * 0.4) < radius) { m.hp -= dmg; hits++; this.burst(m, true, 0xffd24a); }
+    }
+    return hits;
+  }
+  castBoulder(x, y, sp) {
+    const o = this.slingBase, mx = (o.x + x) / 2, my = Math.min(o.y, y) - 120;
+    const rock = this.add.image(o.x, o.y, 'p_boulder').setDepth(90).setScale(1);
+    const T = { v: 0 };
+    this.tweens.add({ targets: T, v: 1, duration: 520, ease: 'Quad.In',
+      onUpdate: () => { const t = T.v;
+        rock.x = (1 - t) * (1 - t) * o.x + 2 * (1 - t) * t * mx + t * t * x;
+        rock.y = (1 - t) * (1 - t) * o.y + 2 * (1 - t) * t * my + t * t * y;
+        rock.rotation += 0.3; rock.setScale(1 + t * 0.4);
+      },
+      onComplete: () => { rock.destroy(); this.cameras.main.shake(220, 0.012);
+        this.impactRing(x, y, sp.radius, sp.col);
+        const h = this.aoeDamage(x, y, sp.radius, sp.dmg + this.wave * 60);
+        this.toast('🪨 BOULDER — ' + h + ' crushed!', '#ffe9a0'); }
+    });
+    this.slingPull();
+  }
+  castMeteor(x, y, sp) {
+    const met = this.add.image(x + 40, y - 260, 'p_meteor').setDepth(90).setScale(1.4).setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({ targets: met, x, y, duration: 420, ease: 'Quad.In',
+      onComplete: () => { met.destroy(); this.cameras.main.shake(260, 0.016);
+        this.impactRing(x, y, sp.radius, sp.col);
+        for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, c = this.add.circle(x, y, 3, 0xff7a30).setBlendMode(Phaser.BlendModes.ADD).setDepth(88);
+          this.tweens.add({ targets: c, x: x + Math.cos(a) * sp.radius, y: y + Math.sin(a) * sp.radius * 0.6, alpha: 0, duration: 380, onComplete: () => c.destroy() }); }
+        const h = this.aoeDamage(x, y, sp.radius, sp.dmg + this.wave * 90);
+        // lingering burn
+        for (const m of this.enemies) { const p = project(m.t, m.laneX); if (Math.hypot(p.x - x, p.y - y) < sp.radius) { m.poison = Math.round(sp.dmg * 0.15); m.poisonLeft = 2000; } }
+        this.toast('☄️ METEOR — ' + h + ' scorched!', '#ff7a30'); }
+    });
+  }
+  castFrost(x, y, sp) {
+    this.impactRing(x, y, sp.radius, sp.col);
+    let h = 0;
+    for (const m of this.enemies) { const p = project(m.t, m.laneX);
+      if (Math.hypot(p.x - x, p.y - y - m.baseH * p.scale * 0.4) < sp.radius) { m.frozen = sp.freeze; m.hp -= sp.dmg; h++; } }
+    // frost crystals
+    for (let i = 0; i < 12; i++) { const a = Math.random() * 6.28, d = Math.random() * sp.radius;
+      const c = this.add.circle(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.6, 2.5, 0x8fd8ff).setBlendMode(Phaser.BlendModes.ADD).setDepth(88);
+      this.tweens.add({ targets: c, alpha: 0, scale: 2, duration: 600, onComplete: () => c.destroy() }); }
+    this.toast('❄️ FROST — ' + h + ' frozen!', '#8fd8ff');
+  }
+  impactRing(x, y, radius, col) {
+    const ring = this.add.ellipse(x, y, 20, 8).setStrokeStyle(4, col, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(89);
+    this.tweens.add({ targets: ring, scaleX: radius / 10, scaleY: radius / 10, alpha: 0, duration: 380, onComplete: () => ring.destroy() });
+  }
+  slingPull() {
+    if (!this.sling) return;
+    this.sling.setScale(1.15); this.time.delayedCall(160, () => this.sling && this.sling.setScale(1));
+  }
+  syncSpellBtns() {
+    for (const key in this.spells) {
+      const el = document.getElementById('sp-' + key);
+      if (el) el.classList.toggle('armed', this.armed === key);
+      const ch = document.getElementById('ch-' + key);
+      if (ch) ch.textContent = this.spells[key].ch;
+      if (el) el.classList.toggle('empty', this.spells[key].ch <= 0);
+    }
   }
 
   // ── waves ────────────────────────────────────────────────────────────────
@@ -318,7 +436,7 @@ export default class LaneScene extends Phaser.Scene {
     this.wave++;
     this.waveSpawned = 0; this.waveKilled = 0;
     this.waveTarget = 6 + this.wave * 2 + (this.wave % 5 === 0 ? 1 : 0);
-    this.spellCharges = Math.min(3, this.spellCharges + 1);
+    for (const k in this.spells) this.spells[k].ch = Math.min(this.spells[k].max, this.spells[k].ch + 1);
     this.elixir = Math.min(ELIXIR_MAX, this.elixir + 2);
     this.toast('🌊 WAVE ' + this.wave + (this.wave % 5 === 0 ? ' — BOSS!' : ''), '#ffd27a');
     this.hudSync(true);
@@ -388,7 +506,8 @@ export default class LaneScene extends Phaser.Scene {
     // enemies
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const m = this.enemies[i];
-      m.t += m.spd * dt / 1000;
+      if (m.frozen > 0) { m.frozen -= dt; m.img.setTint(0x9fd0ff); }   // Frost: held in place
+      else { m.img.clearTint(); m.t += m.spd * dt / 1000; }
       if (m.hp <= 0) { this.killEnemy(i); continue; }
       if (m.t >= 1) {                        // breach!
         this.yourFortress = Math.max(0, this.yourFortress - m.dmgFort);
@@ -527,6 +646,18 @@ export default class LaneScene extends Phaser.Scene {
       g.fillStyle(0xffffff, 0.9); g.fillCircle(7, 7, 6);
       g.fillStyle(0xffffff, 1); g.fillCircle(7, 7, 3);
     });
+    // spell projectiles: slingshot boulder + falling meteor
+    tex('p_boulder', 28, 28, g => {
+      g.fillStyle(0x5e4c38, 1); g.fillCircle(14, 14, 13);
+      g.fillStyle(0x86704f, 1); g.fillCircle(11, 11, 8);
+      g.fillStyle(0x4a3a28, 1); g.fillCircle(17, 17, 4); g.fillCircle(9, 18, 3);
+    });
+    tex('p_meteor', 24, 24, g => {
+      g.fillStyle(0x8a3a10, 1); g.fillCircle(12, 12, 11);
+      g.fillStyle(0xff7a30, 1); g.fillCircle(12, 12, 8);
+      g.fillStyle(0xffd24a, 1); g.fillCircle(11, 11, 4.5);
+      g.fillStyle(0xffffff, 1); g.fillCircle(10, 10, 2);
+    });
     g.destroy();
   }
 
@@ -640,7 +771,7 @@ export default class LaneScene extends Phaser.Scene {
     const bar = (id, cur) => { const e = document.getElementById(id); if (e) e.style.width = (cur / FORT_MAX * 100) + '%'; };
     bar('ef-fill', this.enemyFortress); bar('yf-fill', this.yourFortress);
     set('elixnum', Math.floor(this.elixir));
-    set('spell-n', this.spellCharges + '/3');
+    this.syncSpellBtns();
     const pips = document.querySelectorAll('#elixbar div');
     pips.forEach((d, i) => d.className = i < Math.floor(this.elixir) ? 'on' : '');
     if (full) this.warriors.forEach((w, i) => {

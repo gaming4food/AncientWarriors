@@ -51,7 +51,7 @@ window.AWLANE = {
   scene: () => game.scene.getScene('lane'),
   renderer: () => (game.renderer.type === Phaser.WEBGL ? 'WEBGL' : 'CANVAS'),
   card(i) { this.scene().cardTap(i); },
-  spell() { this.scene().castSpell(); },
+  arm(key) { this.scene().armSpell(key); },
   pause() {
     const paused = this.scene().togglePause();
     document.getElementById('pausebtn').textContent = paused ? '▶' : '❚❚';
