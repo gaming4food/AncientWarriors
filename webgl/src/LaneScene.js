@@ -77,6 +77,8 @@ export default class LaneScene extends Phaser.Scene {
       this.py = ny => ny * dh + (H - dh) / 2;
     } else this.buildCorridor();
 
+    this.makeProjectiles();   // themed projectile textures per warrior style
+
     this.enemyLayer = this.add.container(0, 0).setDepth(20);
     this.warriorLayer = this.add.container(0, 0).setDepth(60);
     this.fxLayer = this.add.container(0, 0).setDepth(80);
@@ -469,21 +471,89 @@ export default class LaneScene extends Phaser.Scene {
       const step = pr.spd * dt / 1000;
       pr.x += dx / d * step; pr.y += dy / d * step;
       pr.img.setPosition(pr.x, pr.y);
+      // orient the projectile to its theme
+      if (pr.spin) pr.img.rotation += 16 * dt / 1000;                 // axe tumbles
+      else if (pr.tex === 'p_magic') pr.img.setRotation(Math.atan2(dy, dx)).setAlpha(0.65 + 0.35 * Math.random());  // lightning flickers
+      else if (pr.tex !== 'p_venom' && pr.tex !== 'p_orb') pr.img.rotation = Math.atan2(dy, dx);  // arrows/spears/swords face travel
     }
 
     if (time - (this._hud || 0) > 200) { this._hud = time; this.hudSync(); }
+  }
+
+  // ── themed projectiles ──────────────────────────────────────────────────────
+  // Procedural sprite textures per warrior style (ps). Arrows/spears/axes rotate to
+  // face travel; lightning flickers; venom & orbs glow. Drawn once at boot.
+  makeProjectiles() {
+    const g = this.make.graphics({ add: false });
+    const tex = (key, w, h, draw) => { g.clear(); draw(g); g.generateTexture(key, w, h); };
+    // arrow — shaft + steel head + green fletching, pointing +x
+    tex('p_arrow', 30, 12, g => {
+      g.fillStyle(0x6a4a2a, 1); g.fillRect(3, 5, 20, 2);
+      g.fillStyle(0xe0e0e6, 1); g.fillTriangle(22, 2, 30, 6, 22, 10);
+      g.fillStyle(0x3aa54a, 1); g.fillTriangle(3, 1, 9, 6, 3, 11);
+    });
+    // holy bolt — glowing gold/white spearhead
+    tex('p_holy', 26, 12, g => {
+      g.fillStyle(0xffd24a, 1); g.fillTriangle(2, 6, 22, 1, 22, 11);
+      g.fillStyle(0xffffff, 1); g.fillTriangle(8, 6, 22, 3.5, 22, 8.5);
+      g.fillStyle(0xffe9a0, 1); g.fillCircle(24, 6, 3);
+    });
+    // lightning bolt — jagged cyan/white zigzag
+    tex('p_magic', 26, 16, g => {
+      g.lineStyle(4, 0x3aa0ff, 0.9); g.beginPath();
+      g.moveTo(1, 8); g.lineTo(8, 2); g.lineTo(12, 10); g.lineTo(18, 3); g.lineTo(25, 9); g.strokePath();
+      g.lineStyle(1.8, 0xffffff, 1); g.beginPath();
+      g.moveTo(1, 8); g.lineTo(8, 2); g.lineTo(12, 10); g.lineTo(18, 3); g.lineTo(25, 9); g.strokePath();
+    });
+    // war axe — twin steel blades on a wood haft (spins)
+    tex('p_axe', 22, 22, g => {
+      g.fillStyle(0x5a4028, 1); g.fillRect(10, 2, 2, 18);
+      g.fillStyle(0xc8c8d2, 1);
+      g.fillTriangle(12, 4, 21, 8, 12, 12); g.fillTriangle(10, 4, 1, 8, 10, 12);
+      g.fillStyle(0xeef0f4, 1); g.fillTriangle(12, 5, 19, 8, 12, 9); g.fillTriangle(10, 5, 3, 8, 10, 9);
+    });
+    // venom glob — layered green with a bright highlight
+    tex('p_venom', 16, 16, g => {
+      g.fillStyle(0x2e7a34, 1); g.fillCircle(8, 8, 7);
+      g.fillStyle(0x7fe04a, 1); g.fillCircle(8, 8, 4.5);
+      g.fillStyle(0xd6ffb0, 1); g.fillCircle(6, 6, 2);
+    });
+    // sword shard (generic melee) + soft orb (magic fallback, tinted per hero)
+    tex('p_sword', 26, 10, g => {
+      g.fillStyle(0xd0d4dc, 1); g.fillTriangle(2, 5, 22, 2, 22, 8);
+      g.fillStyle(0x8a6a2e, 1); g.fillRect(22, 3.5, 4, 3);
+    });
+    tex('p_orb', 14, 14, g => {
+      g.fillStyle(0xffffff, 0.9); g.fillCircle(7, 7, 6);
+      g.fillStyle(0xffffff, 1); g.fillCircle(7, 7, 3);
+    });
+    g.destroy();
+  }
+
+  // Map a warrior's projectile style to a themed texture (+ whether it spins/rotates)
+  projTex(w) {
+    return { arrow: 'p_arrow', holy: 'p_holy', magic: 'p_magic', shadow: 'p_magic',
+             axe: 'p_axe', ankh: 'p_venom', potion: 'p_venom', leaf: 'p_venom',
+             sword: 'p_sword', spear: 'p_holy', javelin: 'p_holy', shuriken: 'p_sword',
+             star: 'p_sword', scroll: 'p_orb', fireball: 'p_orb' }[w.def.ps] || 'p_orb';
   }
 
   fire(w, target, ox) {
     if (!this.enemies.includes(target)) return;   // target may have died during the stagger
     const col = Phaser.Display.Color.HexStringToColor(w.def.pc || '#ffffff').color;
     const sx = w.x + (ox || 0), sy = w.y - w.baseH * 0.55;
-    const r = (w.rank >= 2 && w.def.ab === 'chain') ? 4.4 : 3.6;
-    const img = this.add.circle(sx, sy, r, col).setBlendMode(Phaser.BlendModes.ADD).setDepth(56);
+    const tex = this.projTex(w);
+    const img = this.add.image(sx, sy, tex).setDepth(56);
+    img.setScale(1.1 + (w.rank - 1) * 0.28);
+    const spin = tex === 'p_axe';
+    // glowing types blend additively; the plain orb takes the hero's colour
+    if (tex === 'p_magic' || tex === 'p_holy' || tex === 'p_venom') img.setBlendMode(Phaser.BlendModes.ADD);
+    if (tex === 'p_orb') img.setTint(col).setBlendMode(Phaser.BlendModes.ADD);
     this.fxLayer.add(img);
     // ability rides on the projectile; only active once ascended (rank ≥ 2)
     const ab = w.rank >= 2 ? w.def.ab : null;
-    this.projs.push({ x: sx, y: sy, spd: 560, tid: target.id, dmg: this.heroAtk(w), img, tint: col, ab, rank: w.rank });
+    this.projs.push({ x: sx, y: sy, spd: 560, tid: target.id, dmg: this.heroAtk(w),
+                      img, tint: col, ab, rank: w.rank, tex, spin });
   }
 
   // Signature on-hit effects (rank ≥ 2)
