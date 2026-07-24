@@ -759,6 +759,12 @@ export default class LaneScene extends Phaser.Scene {
   finish(victory, msg) {
     if (this.over) return; this.over = true;
     this.hudSync(true);
+    const result = { victory, wave: this.wave, kills: this.kills,
+                     earnedGold: Math.max(0, this.gold - 350),   // spoils over the starting purse
+                     earnedGems: Math.max(0, this.gems - 180), msg };
+    // Hand off to the meta layer, which banks the spoils and paints the rewards screen.
+    if (window.AWLANE && window.AWLANE.onBattleEnd) { window.AWLANE.onBattleEnd(result); return; }
+    // Fallback (meta not wired): show the bare end overlay.
     const ov = document.getElementById('endov');
     if (ov) {
       document.getElementById('end-title2').textContent = victory ? '🏆 VICTORY!' : '💀 DEFEATED';

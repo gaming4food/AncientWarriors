@@ -73,10 +73,17 @@ buildCards();
 const bar = document.getElementById('elixbar');
 for (let i = 0; i < 10; i++) bar.appendChild(document.createElement('div'));
 
-// ── menu chrome (gold + hero lineup) ──
+// ── menu chrome (gold + gems + glory + hero lineup) ──
 function refreshMenu() {
   const g = document.getElementById('mn-gold');
   if (g) g.textContent = '🪙 ' + Meta.gold.toLocaleString();
+  const gm = document.getElementById('mn-gems');
+  if (gm) gm.textContent = '💎 ' + Meta.gems.toLocaleString();
+  const gp = Meta.gloryProgress();
+  const pl = document.getElementById('mn-plvl');
+  if (pl) pl.textContent = 'Glory Level ' + gp.lvl;
+  const gb = document.getElementById('mn-gbar');
+  if (gb) gb.style.width = Math.round(gp.cur / gp.need * 100) + '%';
   const mnArt = document.getElementById('mn-art');
   if (mnArt) {
     mnArt.innerHTML = '';
@@ -117,6 +124,30 @@ window.AWLANE = {
     game.registry.set('running', false);
     refreshMenu();
     document.getElementById('menu').style.display = 'flex';
+  },
+
+  // ── close the loop: bank spoils + paint the rewards screen ──
+  onBattleEnd(result) {
+    const rw = Meta.bankBattle(result);       // gold/gems/glory into the save
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    set('end-title2', result.victory ? '🏆 VICTORY!' : '💀 DEFEATED');
+    set('end-msg', `${result.msg}  ·  Wave ${result.wave}  ·  ${result.kills} kills`);
+    const gp = Meta.gloryProgress();
+    const parts = [];
+    parts.push(`<div class="rw-row">
+      <div class="rw-chip">🪙 +${rw.gold.toLocaleString()}</div>
+      ${rw.gems ? `<div class="rw-chip gem">💎 +${rw.gems.toLocaleString()}</div>` : ''}
+      <div class="rw-chip glory">⭐ +${rw.glory}</div>
+    </div>`);
+    if (rw.firstWin) parts.push(`<div class="rw-first">✨ First Victory bonus · +${rw.firstBonus} 🪙</div>`);
+    parts.push(`<div class="rw-glory">
+      <div class="rw-lvl">Glory Level ${gp.lvl}${rw.leveledUp ? ' <span class="rw-lup">▲ LEVEL UP!</span>' : ''}</div>
+      <div class="rw-gbar"><i style="width:${Math.round(gp.cur / gp.need * 100)}%"></i></div>
+    </div>`);
+    const box = document.getElementById('end-rewards');
+    if (box) box.innerHTML = parts.join('');
+    refreshMenu();
+    document.getElementById('endov').style.display = 'flex';
   },
 
   // ── meta screens ──

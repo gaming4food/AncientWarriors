@@ -83,6 +83,24 @@
   #end-msg{font-size:12px;color:#c8a24a}
   #endov button{background:linear-gradient(135deg,#c8920f,#ffd700);color:#241a04;border:none;border-radius:11px;
     font-size:14px;font-weight:800;padding:12px 26px;cursor:pointer;font-family:inherit}
+  /* battle rewards */
+  #end-rewards{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:220px}
+  .rw-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .rw-chip{display:flex;align-items:center;gap:5px;background:#1a1208;border:1.5px solid #5a4410;border-radius:10px;
+    padding:7px 14px;font-size:15px;font-weight:800;color:#ffe9a0}
+  .rw-chip.gem{border-color:#3a6a9e;color:#bfe3ff}
+  .rw-chip.glory{border-color:#8a45c8;color:#e0b8ff}
+  .rw-first{font-size:11px;font-weight:800;color:#8be06a;background:rgba(40,60,20,0.5);border:1px solid #3a5a1a;
+    border-radius:8px;padding:5px 12px}
+  .rw-glory{width:200px}
+  .rw-glory .rw-lvl{font-size:12px;font-weight:800;color:#e0b8ff;text-align:center;margin-bottom:3px}
+  .rw-glory .rw-lup{color:#ffd700}
+  .rw-gbar{height:8px;background:#160f22;border:1px solid #3a2a4a;border-radius:5px;overflow:hidden}
+  .rw-gbar i{display:block;height:100%;background:linear-gradient(90deg,#8a45c8,#c47aff);transition:width .5s}
+  /* menu glory progress */
+  .mn-glory{width:100%;padding:0 14px;margin-top:-2px;flex-shrink:0}
+  .mn-gbar{height:5px;background:#160f22;border:1px solid #3a2a4a;border-radius:4px;overflow:hidden}
+  .mn-gbar i{display:block;height:100%;background:linear-gradient(90deg,#8a45c8,#c47aff)}
 
   #dbg{top:38px;left:8px;font-size:9px;color:#8be06a;font-weight:800;text-shadow:0 1px 2px #000;z-index:5}
   .note{width:375px;font-size:10px;color:#8a7a5a;line-height:1.5}
@@ -216,7 +234,7 @@
         <div class="mn-port"><img src="../assets/warriors/w15.png" alt=""></div>
         <div class="mn-pinfo">
           <div class="mn-pname">Commander</div>
-          <div class="mn-plvl">Glory Level 1</div>
+          <div class="mn-plvl" id="mn-plvl">Glory Level 1</div>
         </div>
         <div class="mn-cur">
           <span id="mn-gold">🪙 350</span>
@@ -224,6 +242,7 @@
         </div>
         <div class="mn-gear" onclick="AWLANE.menuToast('⚙️ Settings — coming soon')">⚙️</div>
       </div>
+      <div class="mn-glory"><div class="mn-gbar"><i id="mn-gbar" style="width:0%"></i></div></div>
       <div class="mn-logo">
         <h1><span class="sm">ANCIENT</span><br>WARRIORS</h1>
         <p>🔥 — LEGENDS OF BATTLE — 🔥</p>
@@ -330,6 +349,7 @@
     <div id="endov">
       <div id="end-title2">🏆 VICTORY!</div>
       <div id="end-msg"></div>
+      <div id="end-rewards"></div>
       <div style="display:flex;gap:10px">
         <button onclick="AWLANE.play()">⚔ Battle Again</button>
         <button onclick="AWLANE.menu()" style="background:#1a1208;color:#d4a017;border:1.5px solid #5a4410">← Main Menu</button>

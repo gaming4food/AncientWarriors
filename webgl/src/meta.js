@@ -64,16 +64,32 @@ export const ULTS = {
 const K = k => 'awl_' + k;           // localStorage namespace for the WebGL build
 const RECRUIT_COST = 1000;
 const STARTER_GOLD = 3000;
+const STARTER_GEMS = 50;
 
 let WARRIORS = [], MYTHICS = [], iidC = 0;
 
 const state = {
   gold: STARTER_GOLD,
+  gems: STARTER_GEMS,
+  glory: 0,             // total Glory points earned across all battles
+  firstWin: false,      // one-time "first victory" bonus flag
   roster: [],           // array of warrior instances
   team: [],             // iids of the fielded squad (max 5)
   baseLvl: 1,           // Golden Gate
   wellLvl: 1,           // Elixir Well
 };
+
+// Glory levels: each level costs 25% more Glory than the last (starts at 100).
+export function gloryLevel() {
+  let lvl = 1, need = 100, g = state.glory;
+  while (g >= need) { g -= need; lvl++; need = Math.round(need * 1.25); }
+  return lvl;
+}
+export function gloryProgress() {
+  let lvl = 1, need = 100, g = state.glory;
+  while (g >= need) { g -= need; lvl++; need = Math.round(need * 1.25); }
+  return { lvl, cur: g, need };
+}
 
 // ── instance minting ──────────────────────────────────────────────────────────
 function rollRarity() {
@@ -137,6 +153,9 @@ export const startElixir = () => 5 + Math.floor((state.wellLvl - 1) / 3);
 function save() {
   try {
     localStorage.setItem(K('gold'), String(state.gold));
+    localStorage.setItem(K('gems'), String(state.gems));
+    localStorage.setItem(K('glory'), String(state.glory));
+    localStorage.setItem(K('firstwin'), state.firstWin ? '1' : '0');
     localStorage.setItem(K('roster'), JSON.stringify(state.roster));
     localStorage.setItem(K('team'), JSON.stringify(state.team));
     localStorage.setItem(K('bastion'), JSON.stringify({ base: state.baseLvl, well: state.wellLvl }));
@@ -148,12 +167,16 @@ function load() {
     state.roster = (Array.isArray(r) && r.length) ? r : Array.from({ length: 6 }, () => makeInstance());
     state.team = JSON.parse(localStorage.getItem(K('team')) || '[]');
     state.gold = parseInt(localStorage.getItem(K('gold')) || String(STARTER_GOLD), 10);
+    state.gems = parseInt(localStorage.getItem(K('gems')) || String(STARTER_GEMS), 10);
+    state.glory = parseInt(localStorage.getItem(K('glory')) || '0', 10);
+    state.firstWin = localStorage.getItem(K('firstwin')) === '1';
     const b = JSON.parse(localStorage.getItem(K('bastion')) || '{}');
     state.baseLvl = Math.min(BASTION_MAX, b.base || 1);
     state.wellLvl = Math.min(BASTION_MAX, b.well || 1);
   } catch (e) {
     state.roster = Array.from({ length: 6 }, () => makeInstance());
-    state.team = []; state.gold = STARTER_GOLD; state.baseLvl = 1; state.wellLvl = 1;
+    state.team = []; state.gold = STARTER_GOLD; state.gems = STARTER_GEMS;
+    state.glory = 0; state.firstWin = false; state.baseLvl = 1; state.wellLvl = 1;
   }
   // rebase the instance-id counter and backfill any missing fields
   iidC = state.roster.reduce((a, r) => Math.max(a, r.iid || 0), iidC);
@@ -180,6 +203,9 @@ export const Meta = {
     return this;
   },
   get gold() { return state.gold; },
+  get gems() { return state.gems; },
+  get glory() { return state.glory; },
+  gloryLevel, gloryProgress,
   get roster() { return state.roster; },
   get team() { return state.team; },
   get baseLvl() { return state.baseLvl; },
@@ -256,6 +282,27 @@ export const Meta = {
   upgradeWell() {
     if (state.wellLvl >= BASTION_MAX || state.gold < wellUpCost()) return false;
     state.gold -= wellUpCost(); state.wellLvl++; save(); return true;
+  },
+
+  // ── close the loop: bank a finished battle's spoils into the persistent save ──
+  // result = { victory, wave, kills, earnedGold, earnedGems }
+  bankBattle(result) {
+    const { victory, wave = 0, earnedGold = 0, earnedGems = 0 } = result || {};
+    const beforeLvl = gloryLevel();
+    // Win: full spoils + a completion bonus that scales with how far you pushed.
+    // Loss: a consolation cut so a run is never a total waste (keeps grinding fair).
+    const goldMult = victory ? 1 : 0.4;
+    const winBonus = victory ? 100 + wave * 20 : 0;
+    let gold = Math.round(earnedGold * goldMult) + winBonus;
+    let gems = victory ? earnedGems + Math.max(1, Math.round(wave / 4)) : Math.floor(earnedGems * 0.4);
+    const glory = victory ? 15 + wave * 2 : Math.floor(wave / 2);
+    // one-time bonus the first time a player ever wins
+    let firstWin = false, firstBonus = 0;
+    if (victory && !state.firstWin) { state.firstWin = true; firstWin = true; firstBonus = 500; gold += firstBonus; }
+    state.gold += gold; state.gems += gems; state.glory += glory;
+    save();
+    const afterLvl = gloryLevel();
+    return { gold, gems, glory, firstWin, firstBonus, leveledUp: afterLvl > beforeLvl, level: afterLvl };
   },
 
   // dev helper mirrored from the classic Top-Up
