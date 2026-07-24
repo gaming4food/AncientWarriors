@@ -44,6 +44,7 @@ function squadIds() {
 }
 // Feed the current save into the scene's registry (read at battle start).
 function pushMetaToRegistry() {
+  game.registry.set('battleMode', 'grid');   // original top-down grid battle
   game.registry.set('squad', squadIds());
   game.registry.set('baseLvl', Meta.baseLvl);
   game.registry.set('wellRegenMs', wellRegenMs());

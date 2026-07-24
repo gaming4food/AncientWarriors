@@ -7,10 +7,19 @@
 // (t, laneX) -> screen x/y/scale so gameplay stays in depth-space.
 
 const W = 375, H = 700;
-// Horizon sits at the painted fortress gate; near line at the summon platforms.
+// ── spatial mode ──────────────────────────────────────────────────────────────
+// 'grid'  = the ORIGINAL top-down arena: enemies march straight down flat lanes,
+//           heroes hold a defensive row, constant scale (no perspective).
+// 'lane'  = the perspective corridor prototype (enemies scale up as they near).
+// Set from registry ('battleMode') in create(); the whole loop reads project().
+let MODE = 'grid';
+// perspective geometry (lane mode)
 const HORIZON_Y = 0.17 * H, NEAR_Y = 0.775 * H;
 const HALF_FAR = 0.05 * W, HALF_NEAR = 0.45 * W;
 const SCALE_FAR = 0.13, SCALE_NEAR = 1.0;
+// flat top-down geometry (grid mode): t=0 enemy gate → t=1 your line
+const GRID_TOP = 0.13 * H, GRID_BASE = 0.72 * H, GRID_HALF = 0.40 * W;
+function aimTop() { return MODE === 'grid' ? GRID_TOP : HORIZON_Y; }
 const MAX_WAVE = 20, FORT_MAX = 10000;
 const ELIXIR_MAX = 10, ELIXIR_MS = 1400;
 const MAX_STACK = 5;   // reinforcements per platform (elixir is the allowance)
@@ -23,7 +32,11 @@ const ABILITY_NAME = { twin: 'Twin Arrows', inspire: 'Inspire', chain: 'Chain Li
 
 function persp(t) { return t * t * 0.68 + t * 0.32; }
 export function project(t, laneX) {
-  const p = persp(Phaser.Math.Clamp(t, 0, 1));
+  const c = Phaser.Math.Clamp(t, 0, 1);
+  if (MODE === 'grid') {          // flat top-down: straight lanes, constant scale
+    return { x: W / 2 + laneX * GRID_HALF, y: GRID_TOP + (GRID_BASE - GRID_TOP) * c, scale: 1, p: c };
+  }
+  const p = persp(c);
   const y = HORIZON_Y + (NEAR_Y - HORIZON_Y) * p;
   const half = HALF_FAR + (HALF_NEAR - HALF_FAR) * p;
   return { x: W / 2 + laneX * half, y, scale: SCALE_FAR + (SCALE_NEAR - SCALE_FAR) * p, p };
@@ -35,6 +48,7 @@ export default class LaneScene extends Phaser.Scene {
 
   preload() {
     const D = this.D, art = D.art || { corridor: false, corridorFull: false, back: {} };
+    this.mode = this.game.registry.get('battleMode') || 'grid';
     // Squad chosen in My Warriors (registry), falling back to the default five.
     const byId = id => D.warriors.find(w => w.id === id) || D.mythics.find(m => m.id === id);
     const ids = (this.game.registry.get('squad') || [2, 15, 4, 10, 8]).slice(0, 5);
@@ -42,10 +56,12 @@ export default class LaneScene extends Phaser.Scene {
     if (!this.squadDefs.length) this.squadDefs = [2, 15, 4, 10, 8].map(byId);
     this.squadDefs.forEach(w => {
       const pfx = w.id >= 100 ? 'm' : 'w';              // mythic vs base sprite file
-      if (art.back && art.back[w.id]) this.load.image('h' + w.id, `../assets/warriors/back/b${w.id}.png`);
+      // grid = top-down, heroes face the camera (front art); lane = back-view art
+      if (this.mode !== 'grid' && art.back && art.back[w.id]) this.load.image('h' + w.id, `../assets/warriors/back/b${w.id}.png`);
       else this.load.image('h' + w.id, `../assets/warriors/${pfx}${w.id}.png`);
     });
-    if (art.corridorTop) this.load.image('corridor_top', '../assets/lane/corridor_top.png');
+    if (this.mode === 'grid') this.load.image('arena', '../assets/arena.png');
+    else if (art.corridorTop) this.load.image('corridor_top', '../assets/lane/corridor_top.png');
     else if (art.corridorFull) this.load.image('corridor_full', '../assets/lane/corridor_full.png');
     else if (art.corridor) this.load.image('corridor', '../assets/lane/corridor.png');
     ['goblin', 'skeleton', 'orc', 'shieldbearer', 'ogre', 'boss']
@@ -53,9 +69,26 @@ export default class LaneScene extends Phaser.Scene {
   }
 
   create() {
-    // Preferred: painted lane on top (no heroes) + procedural spawn plaza beneath,
-    // so heroes summon in via cards. Falls back to plate / clean / procedural.
+    this.mode = this.game.registry.get('battleMode') || 'grid';
+    MODE = this.mode;                              // drives project() for the whole loop
     this.plate = false;
+    if (this.mode === 'grid') {
+      // ORIGINAL top-down arena: cover-fit the painted battlefield, then a subtle
+      // defensive-line marker where the heroes hold. Enemies march down onto them.
+      if (this.textures.exists('arena')) {
+        const src = this.textures.get('arena').getSourceImage();
+        const s = Math.max(W / src.width, H / src.height);
+        this.add.image(W / 2, H / 2, 'arena').setDisplaySize(src.width * s, src.height * s).setDepth(0);
+      } else this.buildGridArena();
+      // dark base band + glowing line at the player's row
+      const line = this.add.graphics().setDepth(1);
+      const ly = GRID_BASE + 18;
+      line.fillStyle(0x000000, 0.32); line.fillRect(0, ly, W, H - ly);
+      line.lineStyle(2, 0xffe9a0, 0.35); line.lineBetween(0, ly, W, ly);
+      this.finishCreate();
+      return;
+    }
+    // Perspective lane (prototype): painted lane on top + procedural spawn plaza.
     if (this.textures.exists('corridor_top')) {
       const src = this.textures.get('corridor_top').getSourceImage();
       // cover down to ~72% height so the painted lane is large; crop the outer sides
@@ -79,7 +112,12 @@ export default class LaneScene extends Phaser.Scene {
       this.px = nx => nx * dw + offX;
       this.py = ny => ny * dh + (H - dh) / 2;
     } else this.buildCorridor();
+    this.finishCreate();
+  }
 
+  // Common create tail shared by both spatial modes: layers, game state, spells,
+  // squad deploy, first wave. Runs after the background is drawn and MODE is set.
+  finishCreate() {
     this.makeProjectiles();   // themed projectile textures per warrior style
 
     this.enemyLayer = this.add.container(0, 0).setDepth(20);
@@ -114,6 +152,16 @@ export default class LaneScene extends Phaser.Scene {
     this.deploySquad();
     this.nextWave();
     this.hudSync(true);
+  }
+
+  // Procedural flat arena fallback if arena.png is missing (grid mode).
+  buildGridArena() {
+    const g = this.add.graphics().setDepth(0);
+    g.fillGradientStyle(0x3a2c1a, 0x3a2c1a, 0x1a140c, 0x1a140c, 1); g.fillRect(0, 0, W, H);
+    g.fillStyle(0x2a2012, 1); g.fillRect(0, GRID_TOP - 30, W, 30);   // enemy gate band
+    g.lineStyle(1, 0x5a4626, 0.4);
+    for (let i = 1; i < 8; i++) { const y = GRID_TOP + (GRID_BASE - GRID_TOP) * (i / 8); g.lineBetween(0, y, W, y); }
+    for (let i = 1; i < 5; i++) { const x = W * (i / 5); g.lineBetween(x, GRID_TOP, x, GRID_BASE); }
   }
 
   // ── procedural corridor fallback (unchanged look) ──
@@ -172,6 +220,12 @@ export default class LaneScene extends Phaser.Scene {
   // matched to the squad order [Robin, Joan, Merlin, Viking, Cleopatra].
   // Each: normalized image centre + sprite height (back row further -> smaller).
   slotLayout() {
+    if (this.mode === 'grid') {
+      // ORIGINAL: a defensive row of five along the base line, enemies march onto them.
+      const lanes = [-0.82, -0.41, 0, 0.41, 0.82];
+      const y = GRID_BASE + 44;
+      return lanes.map(lx => ({ x: W / 2 + lx * GRID_HALF, y, h: 104 }));
+    }
     const P = [
       { nx: 0.175, ny: 0.792, h: 122 },   // Robin  — front-left
       { nx: 0.308, ny: 0.652, h: 104 },   // Joan   — back-left
@@ -195,7 +249,7 @@ export default class LaneScene extends Phaser.Scene {
       const disc = this.add.ellipse(0, -2, S.h * 0.62, S.h * 0.24, 0xffe9a0, 0.14)
         .setStrokeStyle(2, 0xffe9a0, 0.55).setBlendMode(Phaser.BlendModes.ADD);
       plat.add(disc); plat.setAlpha(0);
-      const key = this.textures.exists('b' + def.id) ? 'b' + def.id : 'w' + def.id;
+      const key = 'h' + def.id;                  // loaded in preload (front art in grid, back in lane)
       const img = this.add.image(S.x, S.y, key).setOrigin(0.5, 1);
       img.setDisplaySize(img.width * (S.h / img.height), S.h);
       this.warriorLayer.add(img);
@@ -340,7 +394,7 @@ export default class LaneScene extends Phaser.Scene {
   }
   updateAim(x, y) {
     const sp = this.spells[this.armed]; if (!sp) return;
-    y = Phaser.Math.Clamp(y, HORIZON_Y, H - 132);
+    y = Phaser.Math.Clamp(y, aimTop(), H - 132);
     this.aimX = x; this.aimY = y;
     const r = sp.radius;
     this.reticle.setPosition(x, y).setVisible(true);
@@ -365,7 +419,7 @@ export default class LaneScene extends Phaser.Scene {
     const key = this.armed, sp = this.spells[key];
     this.armed = null; this.reticle.setVisible(false); this.arc.clear(); this.syncSpellBtns();
     if (!sp || sp.ch <= 0 || this.over) return;
-    y = Phaser.Math.Clamp(y, HORIZON_Y, H - 132);
+    y = Phaser.Math.Clamp(y, aimTop(), H - 132);
     sp.ch--;
     if (sp.kind === 'boulder') this.castBoulder(x, y, sp);
     else if (sp.kind === 'meteor') this.castMeteor(x, y, sp);
@@ -468,7 +522,7 @@ export default class LaneScene extends Phaser.Scene {
                 hitFort: Math.round(et.hp * hpMul * (boss ? 2.2 : 1) / 14) };
     m.mhp = m.hp;
     m.img = this.add.image(0, 0, 'e_' + k).setOrigin(0.5, 1);
-    m.baseH = boss ? 150 : 108;
+    m.baseH = this.mode === 'grid' ? (boss ? 96 : 60) : (boss ? 150 : 108);
     this.enemyLayer.add(m.img);
     m.bar = this.makeBar(0, 0, boss ? 44 : 30, 0xe23c3c);
     this.enemies.push(m);
