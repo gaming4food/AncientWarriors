@@ -149,9 +149,125 @@ export default class LaneScene extends Phaser.Scene {
     this.setupSpellInput();
     this.slingBase = { x: W / 2, y: H - 96 };   // slingshot launch origin (near player)
 
-    this.deploySquad();
+    if (this.mode === 'grid') { this.warriors = []; this.units = []; this.buildTiles(); }
+    else this.deploySquad();
     this.nextWave();
     this.hudSync(true);
+  }
+
+  // ── ORIGINAL GRID: summon copies onto a 4×3 tile grid, drag to merge/sell ────
+  tilesLayout() {
+    const cols = [0.2, 0.4, 0.6, 0.8], rows = [0.46, 0.58, 0.70];
+    const arr = [];
+    for (const ry of rows) for (const cx of cols) arr.push({ x: cx * W, y: ry * H, unit: null });
+    return arr;   // 12 slots
+  }
+  buildTiles() {
+    this.tiles = this.tilesLayout();
+    const g = this.add.graphics().setDepth(2);
+    g.lineStyle(1.5, 0xffe9a0, 0.16);
+    for (const t of this.tiles) { g.strokeEllipse(t.x, t.y - 6, 46, 20); }
+    // sell strip between the base line and the tray
+    this.sellTop = GRID_BASE + 16; this.sellBot = H - 128;
+    const s = this.add.graphics().setDepth(2);
+    s.fillStyle(0xc084fc, 0.06); s.fillRect(0, this.sellTop, W, this.sellBot - this.sellTop);
+    this.add.text(W / 2, (this.sellTop + this.sellBot) / 2, '↓ drag here to sell for elixir ↓',
+      { fontSize: '9px', color: '#c084fc' }).setOrigin(0.5).setDepth(3).setAlpha(0.6);
+  }
+  summonCost(i) { return [2, 3, 3, 4, 3][i] ?? 3; }
+  costForDef(def) { const i = this.squadDefs.findIndex(d => d.id === def.id); return this.summonCost(i < 0 ? 0 : i); }
+
+  // summon a fresh ×1 copy of squad hero i onto a random open tile
+  summonUnit(i) {
+    if (this.over || this.armed) return 'armed';
+    const def = this.squadDefs[i]; if (!def) return;
+    const cost = this.summonCost(i);
+    const open = this.tiles.filter(t => !t.unit);
+    if (!open.length) { this.toast('No open tiles — merge or sell first', '#c8a24a'); return 'full'; }
+    if (this.elixir < cost) { this.toast('Need ' + cost + ' elixir!', '#7ec8ff'); return 'poor'; }
+    this.elixir -= cost;
+    const tile = open[(Math.random() * open.length) | 0];
+    const u = this.makeUnit(def, tile);
+    tile.unit = u; this.units.push(u);
+    this.summonFx(u);
+    this.toast(def.name + ' takes the field!', '#ffd24a');
+    this.hudSync(true);
+    return 'ok';
+  }
+  makeUnit(def, tile) {
+    const h = 92, key = 'h' + def.id;
+    const img = this.add.image(tile.x, tile.y, key).setOrigin(0.5, 1);
+    img.setDisplaySize(img.width * (h / img.height), h).setDepth(tile.y);
+    this.warriorLayer.add(img);
+    // hero-shaped so it flows through the SAME firing code as the lane heroes
+    const u = { def, img, tile, i: this.squadDefs.indexOf(def), x: tile.x, y: tile.y,
+                baseH: h, slotH: h, texKey: key, deployed: true, count: 1, rank: 1, star: 1,
+                cd: 0, spd: def.aspd * 0.55, range: 0.92, phase: Math.random() * 6.28, atkAt: -1e9, flankers: [] };
+    u.badge = this.add.text(tile.x, tile.y - h - 4, '★1',
+      { fontSize: '10px', color: '#fff', fontStyle: 'bold', backgroundColor: '#7a3a10', padding: { x: 4, y: 1 } })
+      .setOrigin(0.5, 0).setDepth(70);
+    return u;
+  }
+  unitBadge(u) {
+    u.badge.setText('★' + u.star)
+      .setBackgroundColor(u.star >= 4 ? '#8a5a10' : u.star >= 2 ? '#2a4a7a' : '#7a3a10');
+  }
+  removeUnit(u) {
+    if (u.tile) u.tile.unit = null;
+    u.img.destroy(); if (u.badge) u.badge.destroy();
+    this.units = this.units.filter(x => x !== u);
+  }
+  snapUnit(u) {
+    u.img.setPosition(u.x, u.y).setDepth(u.y);
+    if (u.badge) u.badge.setPosition(u.x, u.y - u.baseH - 4);
+  }
+  // MERGE: fuse src into tgt (same hero + same star, star<4) → tgt gains a star
+  mergeUnits(src, tgt) {
+    if (src.def.id !== tgt.def.id || src.star !== tgt.star || tgt.star >= 4) return false;
+    this.removeUnit(src);
+    tgt.star++; tgt.rank = Math.min(MAX_RANK, tgt.star);       // rank drives ability/projectile scale
+    tgt.baseH = Math.round(tgt.slotH * (1 + 0.08 * (tgt.star - 1)));
+    tgt.img.setDisplaySize(tgt.img.width * (tgt.baseH / tgt.img.height), tgt.baseH).setTint(this.rankTint(tgt.rank));
+    tgt.spd = Math.max(90, tgt.spd * 0.82);
+    tgt.range = Math.min(1, tgt.range + 0.02);
+    this.snapUnit(tgt); this.unitBadge(tgt); this.ascendFx(tgt);
+    const ab = ABILITY_NAME[tgt.def.ab];
+    this.toast('✦ ' + tgt.def.name + ' merged → ' + '★'.repeat(tgt.star) + (tgt.star >= 2 && ab ? ' · ' + ab + '!' : ''), '#ffd24a');
+    this.hudSync(true);
+    return true;
+  }
+  sellUnit(u) {
+    const refund = Math.max(1, Math.floor(this.costForDef(u.def) / 2));
+    this.elixir = Math.min(ELIXIR_MAX, this.elixir + refund);
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * 6.28, c = this.add.circle(u.x, u.y - 20, 3, 0xc084fc).setBlendMode(Phaser.BlendModes.ADD).setDepth(86);
+      this.tweens.add({ targets: c, x: u.x + Math.cos(a) * 30, y: u.y - 20 + Math.sin(a) * 30, alpha: 0, duration: 400, onComplete: () => c.destroy() }); }
+    this.removeUnit(u);
+    this.toast(u.def.name + ' sold · +' + refund + '💧', '#c084fc');
+    this.hudSync(true);
+  }
+  // pointer drag: pick up a unit, drag onto a match to merge / onto the strip to sell
+  startUnitDrag(x, y) {
+    let best = null, bd = 30;
+    for (const u of this.units) { const d = Math.hypot(x - u.x, y - (u.y - u.baseH * 0.4)); if (d < bd) { bd = d; best = u; } }
+    if (best) { this.drag = { u: best, sx: x, sy: y, moved: false }; best.img.setDepth(300); if (best.badge) best.badge.setDepth(301); }
+  }
+  moveUnitDrag(x, y) {
+    const dr = this.drag, u = dr.u;
+    u.img.setPosition(x, y + u.baseH * 0.4);
+    if (u.badge) u.badge.setPosition(x, y + u.baseH * 0.4 - u.baseH - 4);
+    if (Math.hypot(x - dr.sx, y - dr.sy) > 8) dr.moved = true;
+  }
+  dropUnit(x, y) {
+    const dr = this.drag; this.drag = null; const u = dr.u;
+    if (!dr.moved) { this.snapUnit(u); return; }                 // a tap, not a drag
+    if (y >= this.sellTop && y <= this.sellBot) { this.sellUnit(u); return; }
+    for (const t of this.units) {
+      if (t === u) continue;
+      if (Math.hypot(x - t.x, y - (t.y - t.baseH * 0.4)) < 36 && u.def.id === t.def.id && u.star === t.star && t.star < 4) {
+        this.mergeUnits(u, t); return;
+      }
+    }
+    this.snapUnit(u);                                            // no valid drop → snap home
   }
 
   // Procedural flat arena fallback if arena.png is missing (grid mode).
@@ -274,8 +390,12 @@ export default class LaneScene extends Phaser.Scene {
     });
   }
 
-  // per-warrior attack, scaled by ascension rank (quantity via count, quality via rank)
-  heroAtk(w) { return Math.round(w.def.atk * 3 * RANK_MULT[w.rank - 1]); }
+  // per-warrior attack. Grid: each merged star is +65% (the original merge curve).
+  // Lane: ascension rank multiplier.
+  heroAtk(w) {
+    if (this.mode === 'grid') return Math.round(w.def.atk * 3 * Math.pow(1.65, (w.star || 1) - 1));
+    return Math.round(w.def.atk * 3 * RANK_MULT[w.rank - 1]);
+  }
   // rising reinforcement cost: base + units already fielded (per rank)
   upCost(w) { return w.deployed ? w.cost + w.count : w.cost; }
   // ascension cost: fuse a full ×5 stack into a rank-up elite (bigger commitment)
@@ -285,6 +405,7 @@ export default class LaneScene extends Phaser.Scene {
   // card tap / warrior click: summon → reinforce (×5) → ASCEND (rank up) → reinforce again…
   cardTap(i) {
     if (this.over || this.armed) return 'armed';   // aiming a spell — don't summon
+    if (this.mode === 'grid') return this.summonUnit(i);   // original: summon a copy onto a tile
     const w = this.warriors[i];
     // full stack + can rank up → this action ascends instead of reinforcing
     if (this.canAscend(w)) return this.ascend(w);
@@ -377,11 +498,18 @@ export default class LaneScene extends Phaser.Scene {
     const ring = this.add.graphics(); this.reticle.add(ring); this.reticle.ring = ring;
     this.arc = this.add.graphics().setDepth(95);   // slingshot trajectory preview
     this.input.on('pointerdown', p => {
-      if (!this.armed || this.over || p.y > H - 132) return;   // ignore taps on the tray
-      this.aiming = true; this.updateAim(p.x, p.y);
+      if (this.over) return;
+      if (this.armed) { if (p.y > H - 132) return; this.aiming = true; this.updateAim(p.x, p.y); return; }
+      if (this.mode === 'grid') this.startUnitDrag(p.x, p.y);   // pick up a warrior to merge/sell
     });
-    this.input.on('pointermove', p => { if (this.aiming) this.updateAim(p.x, p.y); });
-    this.input.on('pointerup', p => { if (this.aiming) { this.aiming = false; this.castArmed(p.x, p.y); } });
+    this.input.on('pointermove', p => {
+      if (this.aiming) { this.updateAim(p.x, p.y); return; }
+      if (this.drag) this.moveUnitDrag(p.x, p.y);
+    });
+    this.input.on('pointerup', p => {
+      if (this.aiming) { this.aiming = false; this.castArmed(p.x, p.y); return; }
+      if (this.drag) this.dropUnit(p.x, p.y);
+    });
   }
   armSpell(key) {
     if (this.over) return;
@@ -593,16 +721,20 @@ export default class LaneScene extends Phaser.Scene {
         .setSize((bw - 2) * Math.max(0, m.hp / m.mhp), 3 * p.scale + 1).setDepth(71);
     }
 
-    // Inspire aura (Joan, ascended): all heroes fire faster
+    // combat units: grid = summoned copies on tiles; lane = the fixed hero row
+    const combat = this.mode === 'grid' ? this.units : this.warriors;
+
+    // Inspire aura (ascended Joan): all allies fire faster
     this.fireBoost = 1;
-    for (const o of this.warriors)
+    for (const o of combat)
       if (o.deployed && o.def.ab === 'inspire' && o.rank >= 2)
         this.fireBoost = Math.min(this.fireBoost, 1 - 0.16 * (o.rank - 1));
 
-    // heroes
-    for (const w of this.warriors) {
+    // heroes / units
+    for (const w of combat) {
       if (!w.deployed) continue;
-      if (!this.plate) {
+      const dragging = this.drag && this.drag.u === w;   // don't fight the pointer
+      if (!this.plate && !dragging) {
         const br = Math.sin(time / 620 + w.phase);
         let oy = br * 1.2, sy = 1 + br * 0.012;
         const el = time - w.atkAt;
@@ -844,7 +976,14 @@ export default class LaneScene extends Phaser.Scene {
     this.syncSpellBtns();
     const pips = document.querySelectorAll('#elixbar div');
     pips.forEach((d, i) => d.className = i < Math.floor(this.elixir) ? 'on' : '');
-    if (full) this.warriors.forEach((w, i) => {
+    if (full && this.mode === 'grid') this.squadDefs.forEach((def, i) => {
+      const n = (this.units || []).filter(u => u.def.id === def.id).length;
+      set('clvl-' + i, n ? 'FIELDED ×' + n : 'SUMMON');
+      set('cost-' + i, this.summonCost(i));
+      const card = document.getElementById('card-' + i);
+      if (card) { card.classList.remove('maxed', 'ascend'); }
+    });
+    else if (full) this.warriors.forEach((w, i) => {
       const stars = RANK_STARS[w.rank - 1];
       let label, cost, maxed = false, ascend = false;
       if (!w.deployed) { label = 'SUMMON'; cost = w.cost; }
