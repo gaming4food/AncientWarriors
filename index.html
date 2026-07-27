@@ -23,7 +23,8 @@ body{background:#0a0a0a;display:flex;justify-content:center;align-items:center;m
 .mn-gold{background:#1a120a;border:1px solid #5a4410;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;color:#ffd700;cursor:pointer;white-space:nowrap}
 .mn-gold b{display:inline-block;background:#d4a017;color:#241a04;border-radius:50%;width:13px;text-align:center;margin-left:3px;font-size:10px}
 .mn-team{font-size:10px;color:#d4a017;font-weight:700}
-.mn-gear{font-size:19px;background:#1a120a;border:1.5px solid #5a4410;border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.mn-gear{font-size:19px;background:#1a120a;border:1.5px solid #5a4410;border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;overflow:hidden}
+.mn-gear img{width:100%;height:100%;object-fit:cover;border-radius:7px}
 .mn-gear:active{filter:brightness(1.4)}
 .mn-logo{text-align:center;margin:2px 0 6px;flex-shrink:0}
 .mn-logo h1{font-family:Georgia,'Times New Roman',serif;font-size:38px;line-height:0.92;font-weight:900;letter-spacing:2px;background:linear-gradient(180deg,#ffe9a0 0%,#f5c845 38%,#9a6410 68%,#e8b83a 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 1px rgba(0,0,0,0.85)) drop-shadow(0 0 16px rgba(212,160,23,0.35))}
@@ -482,7 +483,7 @@ body{background:#0a0a0a;display:flex;justify-content:center;align-items:center;m
         <span class="mn-gold" id="mn-gold" onclick="go('sh')">🪙 0 <b>+</b></span>
         <span class="mn-team" id="mn-team">👥 5/5</span>
       </div>
-      <div class="mn-gear" onclick="openSettings()">⚙️</div>
+      <div class="mn-gear" onclick="openSettings()"><img src="assets/settings.png" alt="Settings"></div>
     </div>
     <div class="mn-logo">
       <h1><span class="sm">ANCIENT</span><br>WARRIORS</h1>
